@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<!-- ABOUTME: Trunk entry document for the wasm build of nat-calc. -->
+<!-- ABOUTME: Hosts the eframe canvas and a pre-wasm loading state. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>nat-calc</title>
+    <link data-trunk rel="rust" data-bin="nat_calc" data-wasm-opt="2" />
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #0d0e13;
+        overflow: hidden;
+      }
+      canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #loading {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #848a9c;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 15px;
+        letter-spacing: 0.04em;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loading">compiling reduction engine…</div>
+    <canvas id="the_canvas_id"></canvas>
+    <script>
+      // Hide the loader once eframe has painted its first frame.
+      const obs = new MutationObserver(() => {
+        const el = document.getElementById("loading");
+        if (el) el.style.display = "none";
+      });
+      obs.observe(document.getElementById("the_canvas_id"), { attributes: true });
+    </script>
+  </body>
+</html>

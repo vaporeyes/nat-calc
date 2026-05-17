@@ -1,0 +1,31 @@
+[package]
+name = "nat_calc"
+version = "0.1.0"
+edition = "2024"
+default-run = "nat_calc"
+
+[dependencies]
+bigdecimal = "0.4"
+eframe = "0.34"
+
+# rustyline (native REPL) cannot compile to wasm; gate it off the web build.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rustyline = "18.0.0"
+
+# Web entry-point glue, only pulled in for the wasm32 build.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = [
+    "Document",
+    "Window",
+    "Element",
+    "HtmlCanvasElement",
+] }
+
+[[bin]]
+name = "nat_calc"
+path = "src/main.rs"
+
+[[bin]]
+name = "repl"
+path = "src/bin/repl.rs"
