@@ -113,7 +113,7 @@ pub fn derive(var: &str, expr: &Expr) -> EvalResultT<Expr> {
 
         // Differentiate through explicit command wrappers by differentiating
         // their target. Nested `derive` (higher-order) is not supported.
-        Expr::Simplify(e) | Expr::Expand(e) => derive(var, e),
+        Expr::Simplify(e) | Expr::Expand(e) | Expr::Truth(e) => derive(var, e),
         Expr::Assign(_, e) => derive(var, e),
         Expr::Derive(_, _) => Err(EvalError::TypeMismatch(
             "higher-order derivatives are not supported".into(),

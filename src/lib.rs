@@ -9,6 +9,7 @@ pub mod error;
 pub mod expand;
 pub mod lambda;
 pub mod lexer;
+pub mod logic;
 pub mod numeric;
 pub mod parser;
 pub mod simplify;

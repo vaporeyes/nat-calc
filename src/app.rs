@@ -173,6 +173,7 @@ fn mode_of(r: &EvalResult) -> Mode {
     match r {
         EvalResult::Numeric(_) => Mode::Eager,
         EvalResult::Bool(_) => Mode::Logic,
+        EvalResult::TruthTable(_) => Mode::Logic,
         EvalResult::Matrix(_) => Mode::Matrix,
         EvalResult::Symbolic(_) => Mode::Lazy,
         EvalResult::Lambda(_) => Mode::Lambda,

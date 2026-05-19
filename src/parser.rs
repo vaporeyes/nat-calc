@@ -19,7 +19,7 @@ pub fn parse(src: &str) -> EvalResultT<Expr> {
 fn is_builtin(name: &str) -> bool {
     matches!(
         name,
-        "simplify" | "expand" | "derive" | "sin" | "cos" | "tan" | "exp" | "ln"
+        "simplify" | "expand" | "derive" | "truth" | "sin" | "cos" | "tan" | "exp" | "ln"
     )
 }
 
@@ -245,6 +245,7 @@ impl Parser {
         let built = match name {
             "simplify" => Expr::Simplify(Box::new(arg)),
             "expand" => Expr::Expand(Box::new(arg)),
+            "truth" => Expr::Truth(Box::new(arg)),
             "sin" => Expr::Call(Func::Sin, Box::new(arg)),
             "cos" => Expr::Call(Func::Cos, Box::new(arg)),
             "tan" => Expr::Call(Func::Tan, Box::new(arg)),

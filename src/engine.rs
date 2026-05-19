@@ -6,6 +6,7 @@ use crate::derive::derive;
 use crate::error::{EvalError, EvalResultT};
 use crate::expand::expand;
 use crate::lambda::reduce_lambda;
+use crate::logic::{TruthTable, truth_table};
 use crate::numeric::{as_integer_exponent, bounded_div, pow_int};
 use crate::simplify::simplify;
 use bigdecimal::{BigDecimal, Zero};
@@ -16,6 +17,7 @@ use std::collections::{HashMap, HashSet};
 pub enum EvalResult {
     Numeric(BigDecimal),
     Bool(bool),
+    TruthTable(TruthTable),
     Matrix(Vec<Vec<BigDecimal>>),
     Symbolic(Box<Expr>),
     /// A lambda abstraction in normal form (its own reduction mode).
@@ -27,6 +29,7 @@ impl std::fmt::Display for EvalResult {
         match self {
             EvalResult::Numeric(n) => write!(f, "{}", n.normalized()),
             EvalResult::Bool(b) => write!(f, "{b}"),
+            EvalResult::TruthTable(table) => write!(f, "{table}"),
             EvalResult::Matrix(rows) => {
                 write!(f, "[")?;
                 for (i, row) in rows.iter().enumerate() {
@@ -133,6 +136,9 @@ pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
             EvalResult::Bool(_) => Err(EvalError::TypeMismatch(
                 "unary minus cannot be applied to a boolean".into(),
             )),
+            EvalResult::TruthTable(_) => Err(EvalError::TypeMismatch(
+                "unary minus cannot be applied to a truth table".into(),
+            )),
             EvalResult::Symbolic(inner) | EvalResult::Lambda(inner) => {
                 classify(simplify(Expr::negate(*inner))?)
             }
@@ -193,6 +199,7 @@ pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
             let d = derive(var, e)?;
             classify(simplify(d)?)
         }
+        Expr::Truth(e) => Ok(EvalResult::TruthTable(truth_table(e)?)),
     }
 }
 
@@ -375,6 +382,9 @@ fn result_to_expr(r: EvalResult) -> EvalResultT<Expr> {
     match r {
         EvalResult::Numeric(n) => Ok(Expr::Number(n)),
         EvalResult::Bool(b) => Ok(Expr::Bool(b)),
+        EvalResult::TruthTable(_) => Err(EvalError::TypeMismatch(
+            "a truth table cannot appear inside an expression".into(),
+        )),
         EvalResult::Symbolic(e) | EvalResult::Lambda(e) => Ok(*e),
         EvalResult::Matrix(_) => Err(EvalError::TypeMismatch(
             "a matrix cannot appear inside a symbolic expression".into(),

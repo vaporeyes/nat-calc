@@ -56,6 +56,14 @@ fn boolean_expressions_reduce_and_stay_symbolic() {
     assert_eq!(s("a and true"), "(a and true)");
 }
 
+#[test]
+fn truth_table_command_lists_boolean_rows() {
+    assert_eq!(
+        s("truth(a and b)"),
+        "a b | out\n0 0 | 0\n0 1 | 0\n1 0 | 0\n1 1 | 1\n"
+    );
+}
+
 // --- Implicit switching + delayed binding (Sub-Task 4) -------------------
 
 #[test]
