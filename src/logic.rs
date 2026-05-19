@@ -17,6 +17,28 @@ pub struct CircuitDiagram {
     pub lines: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EquivResult {
+    pub equivalent: bool,
+    pub vars: Vec<String>,
+    pub counterexample: Option<Vec<bool>>,
+}
+
+impl fmt::Display for EquivResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.equivalent {
+            return write!(f, "true");
+        }
+        write!(f, "false counterexample:")?;
+        if let Some(values) = &self.counterexample {
+            for (name, value) in self.vars.iter().zip(values) {
+                write!(f, " {name}={}", bool_digit(*value))?;
+            }
+        }
+        Ok(())
+    }
+}
+
 impl fmt::Display for CircuitDiagram {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for line in &self.lines {
@@ -72,6 +94,44 @@ pub fn truth_table(expr: &Expr) -> EvalResultT<TruthTable> {
 pub fn simplify_logic(expr: &Expr) -> EvalResultT<Expr> {
     validate_logic_expr(expr)?;
     Ok(simplify_logic_inner(expr))
+}
+
+pub fn equivalence(left: &Expr, right: &Expr) -> EvalResultT<EquivResult> {
+    validate_logic_expr(left)?;
+    validate_logic_expr(right)?;
+    let vars = merged_vars(left, right);
+    if vars.len() > 8 {
+        return Err(EvalError::ExpressionTooLarge);
+    }
+    let count = 1usize << vars.len();
+    for mask in 0..count {
+        let mut env = HashMap::new();
+        let mut values = Vec::new();
+        for (i, name) in vars.iter().enumerate() {
+            let value = ((mask >> (vars.len() - i - 1)) & 1) == 1;
+            env.insert(name.as_str(), value);
+            values.push(value);
+        }
+        if eval_logic(left, &env)? != eval_logic(right, &env)? {
+            return Ok(EquivResult {
+                equivalent: false,
+                vars,
+                counterexample: Some(values),
+            });
+        }
+    }
+    Ok(EquivResult {
+        equivalent: true,
+        vars,
+        counterexample: None,
+    })
+}
+
+fn merged_vars(left: &Expr, right: &Expr) -> Vec<String> {
+    let mut vars = BTreeSet::new();
+    collect_logic_vars(left, &mut vars);
+    collect_logic_vars(right, &mut vars);
+    vars.into_iter().collect()
 }
 
 fn simplify_logic_inner(expr: &Expr) -> Expr {
@@ -223,6 +283,10 @@ fn collect_logic_vars(expr: &Expr, vars: &mut BTreeSet<String>) {
         }
         Expr::Not(e) | Expr::Truth(e) | Expr::Circuit(e) | Expr::LogicSimplify(e) => {
             collect_logic_vars(e, vars)
+        }
+        Expr::Equiv(l, r) => {
+            collect_logic_vars(l, vars);
+            collect_logic_vars(r, vars);
         }
         Expr::Logic(_, l, r) => {
             collect_logic_vars(l, vars);

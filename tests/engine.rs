@@ -81,6 +81,15 @@ fn logic_simplify_applies_boolean_identities() {
     assert_eq!(s("logic_simplify(not (a and b))"), "(not(a) or not(b))");
 }
 
+#[test]
+fn equivalence_reports_result_and_counterexample() {
+    assert_eq!(s("equiv(a and b, not (not a or not b))"), "true");
+    assert_eq!(
+        s("equiv(a and b, a or b)"),
+        "false counterexample: a=0 b=1"
+    );
+}
+
 // --- Implicit switching + delayed binding (Sub-Task 4) -------------------
 
 #[test]

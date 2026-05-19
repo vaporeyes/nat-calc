@@ -96,7 +96,10 @@ fn free_vars(e: &Expr, acc: &mut BTreeSet<String>) {
             inner.remove(p);
             acc.extend(inner);
         }
-        Expr::Apply(l, r) | Expr::Binary(_, l, r) | Expr::Logic(_, l, r) => {
+        Expr::Apply(l, r)
+        | Expr::Binary(_, l, r)
+        | Expr::Logic(_, l, r)
+        | Expr::Equiv(l, r) => {
             free_vars(l, acc);
             free_vars(r, acc);
         }
@@ -163,6 +166,10 @@ fn substitute(expr: Expr, var: &str, value: &Expr) -> Expr {
         Expr::Not(x) => Expr::Not(Box::new(substitute(*x, var, value))),
         Expr::Logic(op, l, r) => Expr::Logic(
             op,
+            Box::new(substitute(*l, var, value)),
+            Box::new(substitute(*r, var, value)),
+        ),
+        Expr::Equiv(l, r) => Expr::Equiv(
             Box::new(substitute(*l, var, value)),
             Box::new(substitute(*r, var, value)),
         ),

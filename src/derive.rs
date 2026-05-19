@@ -110,6 +110,9 @@ pub fn derive(var: &str, expr: &Expr) -> EvalResultT<Expr> {
         Expr::Not(_) | Expr::Logic(_, _, _) => Err(EvalError::TypeMismatch(
             "cannot differentiate a logic expression".into(),
         )),
+        Expr::Equiv(_, _) => Err(EvalError::TypeMismatch(
+            "cannot differentiate an equivalence check".into(),
+        )),
 
         // Differentiate through explicit command wrappers by differentiating
         // their target. Nested `derive` (higher-order) is not supported.

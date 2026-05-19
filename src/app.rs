@@ -216,6 +216,7 @@ fn mode_of(r: &EvalResult) -> Mode {
         EvalResult::Bool(_) => Mode::Logic,
         EvalResult::TruthTable(_) => Mode::Logic,
         EvalResult::CircuitDiagram(_) => Mode::Logic,
+        EvalResult::EquivResult(_) => Mode::Logic,
         EvalResult::Matrix(_) => Mode::Matrix,
         EvalResult::Symbolic(_) => Mode::Lazy,
         EvalResult::Lambda(_) => Mode::Lambda,

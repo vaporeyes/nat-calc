@@ -7,7 +7,8 @@ use crate::error::{EvalError, EvalResultT};
 use crate::expand::expand;
 use crate::lambda::reduce_lambda;
 use crate::logic::{
-    CircuitDiagram, TruthTable, circuit_diagram, simplify_logic, truth_table,
+    CircuitDiagram, EquivResult, TruthTable, circuit_diagram, equivalence,
+    simplify_logic, truth_table,
 };
 use crate::numeric::{as_integer_exponent, bounded_div, pow_int};
 use crate::simplify::simplify;
@@ -21,6 +22,7 @@ pub enum EvalResult {
     Bool(bool),
     TruthTable(TruthTable),
     CircuitDiagram(CircuitDiagram),
+    EquivResult(EquivResult),
     Matrix(Vec<Vec<BigDecimal>>),
     Symbolic(Box<Expr>),
     /// A lambda abstraction in normal form (its own reduction mode).
@@ -34,6 +36,7 @@ impl std::fmt::Display for EvalResult {
             EvalResult::Bool(b) => write!(f, "{b}"),
             EvalResult::TruthTable(table) => write!(f, "{table}"),
             EvalResult::CircuitDiagram(diagram) => write!(f, "{diagram}"),
+            EvalResult::EquivResult(result) => write!(f, "{result}"),
             EvalResult::Matrix(rows) => {
                 write!(f, "[")?;
                 for (i, row) in rows.iter().enumerate() {
@@ -146,6 +149,9 @@ pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
             EvalResult::CircuitDiagram(_) => Err(EvalError::TypeMismatch(
                 "unary minus cannot be applied to a circuit diagram".into(),
             )),
+            EvalResult::EquivResult(_) => Err(EvalError::TypeMismatch(
+                "unary minus cannot be applied to an equivalence result".into(),
+            )),
             EvalResult::Symbolic(inner) | EvalResult::Lambda(inner) => {
                 classify(simplify(Expr::negate(*inner))?)
             }
@@ -209,6 +215,7 @@ pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
         Expr::Truth(e) => Ok(EvalResult::TruthTable(truth_table(e)?)),
         Expr::Circuit(e) => Ok(EvalResult::CircuitDiagram(circuit_diagram(e)?)),
         Expr::LogicSimplify(e) => classify(simplify_logic(e)?),
+        Expr::Equiv(l, r) => Ok(EvalResult::EquivResult(equivalence(l, r)?)),
     }
 }
 
@@ -396,6 +403,9 @@ fn result_to_expr(r: EvalResult) -> EvalResultT<Expr> {
         )),
         EvalResult::CircuitDiagram(_) => Err(EvalError::TypeMismatch(
             "a circuit diagram cannot appear inside an expression".into(),
+        )),
+        EvalResult::EquivResult(_) => Err(EvalError::TypeMismatch(
+            "an equivalence result cannot appear inside an expression".into(),
         )),
         EvalResult::Symbolic(e) | EvalResult::Lambda(e) => Ok(*e),
         EvalResult::Matrix(_) => Err(EvalError::TypeMismatch(

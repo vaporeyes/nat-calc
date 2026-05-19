@@ -19,8 +19,8 @@ pub fn parse(src: &str) -> EvalResultT<Expr> {
 fn is_builtin(name: &str) -> bool {
     matches!(
         name,
-        "simplify" | "expand" | "derive" | "truth" | "circuit" | "logic_simplify" | "sin"
-            | "cos" | "tan" | "exp" | "ln"
+        "simplify" | "expand" | "derive" | "truth" | "circuit" | "logic_simplify" | "equiv"
+            | "sin" | "cos" | "tan" | "exp" | "ln"
     )
 }
 
@@ -238,6 +238,14 @@ impl Parser {
             let body = self.parse_expr(0)?;
             self.expect(Token::RParen)?;
             return Ok(Expr::Derive(var, Box::new(body)));
+        }
+
+        if name == "equiv" {
+            let left = self.parse_expr(0)?;
+            self.expect(Token::Comma)?;
+            let right = self.parse_expr(0)?;
+            self.expect(Token::RParen)?;
+            return Ok(Expr::Equiv(Box::new(left), Box::new(right)));
         }
 
         let arg = self.parse_expr(0)?;

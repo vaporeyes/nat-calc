@@ -98,6 +98,7 @@ pub enum Expr {
     Truth(Box<Expr>),
     Circuit(Box<Expr>),
     LogicSimplify(Box<Expr>),
+    Equiv(Box<Expr>, Box<Expr>),
 }
 
 impl Expr {
@@ -147,7 +148,10 @@ impl Expr {
             | Expr::Circuit(e)
             | Expr::LogicSimplify(e)
             | Expr::Lambda(_, e) => 1 + e.node_count(),
-            Expr::Binary(_, l, r) | Expr::Logic(_, l, r) | Expr::Apply(l, r) => {
+            Expr::Binary(_, l, r)
+            | Expr::Logic(_, l, r)
+            | Expr::Equiv(l, r)
+            | Expr::Apply(l, r) => {
                 1 + l.node_count() + r.node_count()
             }
         }
@@ -189,6 +193,7 @@ impl fmt::Display for Expr {
             Expr::Truth(e) => write!(f, "truth({e})"),
             Expr::Circuit(e) => write!(f, "circuit({e})"),
             Expr::LogicSimplify(e) => write!(f, "logic_simplify({e})"),
+            Expr::Equiv(l, r) => write!(f, "equiv({l}, {r})"),
         }
     }
 }
