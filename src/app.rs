@@ -640,7 +640,7 @@ fn plot_controls(ui: &mut egui::Ui, cell: &mut Cell) -> Option<nat_calc::graph::
 fn plot_view(ui: &mut egui::Ui, plot: &nat_calc::graph::Plot2D) {
     let width = ui.available_width().clamp(320.0, 720.0);
     let size = egui::vec2(width, 260.0);
-    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::hover());
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 8.0, PANEL);
     painter.rect_stroke(
@@ -681,6 +681,26 @@ fn plot_view(ui: &mut egui::Ui, plot: &nat_calc::graph::Plot2D) {
         }
     }
 
+    if let Some(pointer) = resp.hover_pos()
+        && rect.contains(pointer)
+        && let Some((curve_index, point)) = nearest_plot_point(plot, bounds, rect, pointer)
+    {
+        let color = colors[curve_index % colors.len()];
+        let p = to_screen(point.0, point.1);
+        painter.circle_filled(p, 4.0, color);
+        painter.line_segment(
+            [egui::pos2(p.x, rect.top()), egui::pos2(p.x, rect.bottom())],
+            Stroke::new(1.0, color.linear_multiply(0.45)),
+        );
+        painter.text(
+            p + egui::vec2(8.0, -8.0),
+            egui::Align2::LEFT_BOTTOM,
+            format!("({}, {})", graph_num(point.0), graph_num(point.1)),
+            FontId::monospace(12.0),
+            TEXT,
+        );
+    }
+
     let label = format!(
         "{}: {}..{}",
         plot.var,
@@ -694,6 +714,33 @@ fn plot_view(ui: &mut egui::Ui, plot: &nat_calc::graph::Plot2D) {
         FontId::monospace(12.0),
         DIM,
     );
+}
+
+fn nearest_plot_point(
+    plot: &nat_calc::graph::Plot2D,
+    bounds: (f64, f64, f64, f64),
+    rect: egui::Rect,
+    pointer: egui::Pos2,
+) -> Option<(usize, (f64, f64))> {
+    let to_screen = |x: f64, y: f64| {
+        let tx = ((x - bounds.0) / (bounds.1 - bounds.0)) as f32;
+        let ty = ((y - bounds.2) / (bounds.3 - bounds.2)) as f32;
+        egui::pos2(
+            rect.left() + tx * rect.width(),
+            rect.bottom() - ty * rect.height(),
+        )
+    };
+    let mut best: Option<(usize, (f64, f64), f32)> = None;
+    for (curve_index, curve) in plot.curves.iter().enumerate() {
+        for point in &curve.points {
+            let screen = to_screen(point.0, point.1);
+            let dist = screen.distance_sq(pointer);
+            if best.is_none_or(|(_, _, best_dist)| dist < best_dist) {
+                best = Some((curve_index, *point, dist));
+            }
+        }
+    }
+    best.map(|(i, point, _)| (i, point))
 }
 
 fn plot_bounds(plot: &nat_calc::graph::Plot2D) -> (f64, f64, f64, f64) {
