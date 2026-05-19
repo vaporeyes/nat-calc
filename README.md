@@ -10,6 +10,12 @@ expand, symbolic differentiation), numeric matrices, and untyped lambda
 calculus. It runs as a native desktop GUI, an interactive REPL, or in the
 browser via WebAssembly.
 
+## Screenshots
+
+![main app](screenshots/main.png)
+![in action](screenshots/main2.png)
+
+
 ## Contents
 
 - [Reduction modes](#reduction-modes)
