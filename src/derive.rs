@@ -117,6 +117,7 @@ pub fn derive(var: &str, expr: &Expr) -> EvalResultT<Expr> {
         Expr::HalfAdder(_, _) | Expr::FullAdder(_, _, _) => Err(EvalError::TypeMismatch(
             "cannot differentiate an adder preset".into(),
         )),
+        Expr::Table(e, _, _, _, _) => derive(var, e),
 
         // Differentiate through explicit command wrappers by differentiating
         // their target. Nested `derive` (higher-order) is not supported.

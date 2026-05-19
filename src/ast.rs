@@ -102,6 +102,7 @@ pub enum Expr {
     KMap(Vec<String>, Box<Expr>),
     HalfAdder(Box<Expr>, Box<Expr>),
     FullAdder(Box<Expr>, Box<Expr>, Box<Expr>),
+    Table(Box<Expr>, String, Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
 impl Expr {
@@ -160,6 +161,9 @@ impl Expr {
                 1 + l.node_count() + r.node_count()
             }
             Expr::FullAdder(a, b, c) => 1 + a.node_count() + b.node_count() + c.node_count(),
+            Expr::Table(e, _, start, end, step) => {
+                1 + e.node_count() + start.node_count() + end.node_count() + step.node_count()
+            }
         }
     }
 }
@@ -209,6 +213,9 @@ impl fmt::Display for Expr {
             }
             Expr::HalfAdder(a, b) => write!(f, "half_adder({a}, {b})"),
             Expr::FullAdder(a, b, c) => write!(f, "full_adder({a}, {b}, {c})"),
+            Expr::Table(e, var, start, end, step) => {
+                write!(f, "table({e}, {var}, {start}, {end}, {step})")
+            }
         }
     }
 }

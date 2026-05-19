@@ -7,6 +7,7 @@ pub mod derive;
 pub mod engine;
 pub mod error;
 pub mod expand;
+pub mod graph;
 pub mod lambda;
 pub mod lexer;
 pub mod logic;

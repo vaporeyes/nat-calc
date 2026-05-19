@@ -106,6 +106,14 @@ fn kmap_and_adder_presets_render_logic_outputs() {
     );
 }
 
+#[test]
+fn table_command_samples_numeric_expression() {
+    assert_eq!(
+        s("table(x ^ 2, x, -2, 2, 2)"),
+        "x | y\n-2 | 4\n0 | 0\n2 | 4\n"
+    );
+}
+
 // --- Implicit switching + delayed binding (Sub-Task 4) -------------------
 
 #[test]

@@ -20,7 +20,8 @@ fn is_builtin(name: &str) -> bool {
     matches!(
         name,
         "simplify" | "expand" | "derive" | "truth" | "circuit" | "logic_simplify" | "equiv"
-            | "kmap" | "half_adder" | "full_adder" | "sin" | "cos" | "tan" | "exp" | "ln"
+            | "kmap" | "half_adder" | "full_adder" | "table" | "sin" | "cos" | "tan" | "exp"
+            | "ln"
     )
 }
 
@@ -289,6 +290,33 @@ impl Parser {
                 Box::new(args[0].clone()),
                 Box::new(args[1].clone()),
                 Box::new(args[2].clone()),
+            ));
+        }
+
+        if name == "table" {
+            let expr = self.parse_expr(0)?;
+            self.expect(Token::Comma)?;
+            let var = match self.next() {
+                Token::Ident(v) => v,
+                other => {
+                    return Err(EvalError::Parse(format!(
+                        "table expects a variable as second argument, found {other:?}"
+                    )));
+                }
+            };
+            self.expect(Token::Comma)?;
+            let start = self.parse_expr(0)?;
+            self.expect(Token::Comma)?;
+            let end = self.parse_expr(0)?;
+            self.expect(Token::Comma)?;
+            let step = self.parse_expr(0)?;
+            self.expect(Token::RParen)?;
+            return Ok(Expr::Table(
+                Box::new(expr),
+                var,
+                Box::new(start),
+                Box::new(end),
+                Box::new(step),
             ));
         }
 

@@ -5,6 +5,7 @@ use crate::ast::{BinaryOp, Expr, LogicOp};
 use crate::derive::derive;
 use crate::error::{EvalError, EvalResultT};
 use crate::expand::expand;
+use crate::graph::{ValueTable, table};
 use crate::lambda::reduce_lambda;
 use crate::logic::{
     AdderResult, CircuitDiagram, EquivResult, KMap, TruthTable, adder_preset,
@@ -25,6 +26,7 @@ pub enum EvalResult {
     EquivResult(EquivResult),
     KMap(KMap),
     AdderResult(AdderResult),
+    ValueTable(ValueTable),
     Matrix(Vec<Vec<BigDecimal>>),
     Symbolic(Box<Expr>),
     /// A lambda abstraction in normal form (its own reduction mode).
@@ -41,6 +43,7 @@ impl std::fmt::Display for EvalResult {
             EvalResult::EquivResult(result) => write!(f, "{result}"),
             EvalResult::KMap(map) => write!(f, "{map}"),
             EvalResult::AdderResult(result) => write!(f, "{result}"),
+            EvalResult::ValueTable(table) => write!(f, "{table}"),
             EvalResult::Matrix(rows) => {
                 write!(f, "[")?;
                 for (i, row) in rows.iter().enumerate() {
@@ -162,6 +165,9 @@ pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
             EvalResult::AdderResult(_) => Err(EvalError::TypeMismatch(
                 "unary minus cannot be applied to an adder result".into(),
             )),
+            EvalResult::ValueTable(_) => Err(EvalError::TypeMismatch(
+                "unary minus cannot be applied to a value table".into(),
+            )),
             EvalResult::Symbolic(inner) | EvalResult::Lambda(inner) => {
                 classify(simplify(Expr::negate(*inner))?)
             }
@@ -250,6 +256,9 @@ pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
                 "full_adder",
                 vec![("sum".into(), sum), ("carry".into(), carry)],
             )?))
+        }
+        Expr::Table(e, var, start, end, step) => {
+            Ok(EvalResult::ValueTable(table(e, var, start, end, step)?))
         }
     }
 }
@@ -447,6 +456,9 @@ fn result_to_expr(r: EvalResult) -> EvalResultT<Expr> {
         )),
         EvalResult::AdderResult(_) => Err(EvalError::TypeMismatch(
             "an adder result cannot appear inside an expression".into(),
+        )),
+        EvalResult::ValueTable(_) => Err(EvalError::TypeMismatch(
+            "a value table cannot appear inside an expression".into(),
         )),
         EvalResult::Symbolic(e) | EvalResult::Lambda(e) => Ok(*e),
         EvalResult::Matrix(_) => Err(EvalError::TypeMismatch(

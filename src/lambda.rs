@@ -109,6 +109,12 @@ fn free_vars(e: &Expr, acc: &mut BTreeSet<String>) {
             free_vars(b, acc);
             free_vars(c, acc);
         }
+        Expr::Table(e, _, start, end, step) => {
+            free_vars(e, acc);
+            free_vars(start, acc);
+            free_vars(end, acc);
+            free_vars(step, acc);
+        }
         Expr::Neg(x)
         | Expr::Not(x)
         | Expr::Call(_, x)
@@ -188,6 +194,13 @@ fn substitute(expr: Expr, var: &str, value: &Expr) -> Expr {
             Box::new(substitute(*a, var, value)),
             Box::new(substitute(*b, var, value)),
             Box::new(substitute(*c, var, value)),
+        ),
+        Expr::Table(e, name, start, end, step) => Expr::Table(
+            Box::new(substitute(*e, var, value)),
+            name,
+            Box::new(substitute(*start, var, value)),
+            Box::new(substitute(*end, var, value)),
+            Box::new(substitute(*step, var, value)),
         ),
         Expr::Call(func, x) => {
             Expr::Call(func, Box::new(substitute(*x, var, value)))
