@@ -12,6 +12,20 @@ pub struct TruthTable {
     pub rows: Vec<(Vec<bool>, bool)>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CircuitDiagram {
+    pub lines: Vec<String>,
+}
+
+impl fmt::Display for CircuitDiagram {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for line in &self.lines {
+            writeln!(f, "{line}")?;
+        }
+        Ok(())
+    }
+}
+
 impl fmt::Display for TruthTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for name in &self.vars {
@@ -26,6 +40,13 @@ impl fmt::Display for TruthTable {
         }
         Ok(())
     }
+}
+
+pub fn circuit_diagram(expr: &Expr) -> EvalResultT<CircuitDiagram> {
+    validate_logic_expr(expr)?;
+    let mut lines = vec!["OUT".to_string()];
+    circuit_lines(expr, "", true, &mut lines);
+    Ok(CircuitDiagram { lines })
 }
 
 pub fn truth_table(expr: &Expr) -> EvalResultT<TruthTable> {
@@ -46,6 +67,45 @@ pub fn truth_table(expr: &Expr) -> EvalResultT<TruthTable> {
         rows.push((values, eval_logic(expr, &env)?));
     }
     Ok(TruthTable { vars, rows })
+}
+
+fn circuit_lines(expr: &Expr, prefix: &str, last: bool, lines: &mut Vec<String>) {
+    let branch = if last { "`- " } else { "|- " };
+    lines.push(format!("{prefix}{branch}{}", gate_label(expr)));
+    let child_prefix = format!("{prefix}{}", if last { "   " } else { "|  " });
+    match expr {
+        Expr::Not(e) => circuit_lines(e, &child_prefix, true, lines),
+        Expr::Logic(_, l, r) => {
+            circuit_lines(l, &child_prefix, false, lines);
+            circuit_lines(r, &child_prefix, true, lines);
+        }
+        _ => {}
+    }
+}
+
+fn gate_label(expr: &Expr) -> String {
+    match expr {
+        Expr::Bool(true) => "TRUE".to_string(),
+        Expr::Bool(false) => "FALSE".to_string(),
+        Expr::Variable(name) => name.clone(),
+        Expr::Not(_) => "NOT".to_string(),
+        Expr::Logic(op, _, _) => op.name().to_uppercase(),
+        other => other.to_string(),
+    }
+}
+
+fn validate_logic_expr(expr: &Expr) -> EvalResultT<()> {
+    match expr {
+        Expr::Bool(_) | Expr::Variable(_) => Ok(()),
+        Expr::Not(e) => validate_logic_expr(e),
+        Expr::Logic(_, l, r) => {
+            validate_logic_expr(l)?;
+            validate_logic_expr(r)
+        }
+        other => Err(EvalError::TypeMismatch(format!(
+            "expected logic expression, found {other}"
+        ))),
+    }
 }
 
 pub fn logic_vars(expr: &Expr) -> Vec<String> {
@@ -84,7 +144,7 @@ fn collect_logic_vars(expr: &Expr, vars: &mut BTreeSet<String>) {
         Expr::Variable(name) => {
             vars.insert(name.clone());
         }
-        Expr::Not(e) | Expr::Truth(e) => collect_logic_vars(e, vars),
+        Expr::Not(e) | Expr::Truth(e) | Expr::Circuit(e) => collect_logic_vars(e, vars),
         Expr::Logic(_, l, r) => {
             collect_logic_vars(l, vars);
             collect_logic_vars(r, vars);

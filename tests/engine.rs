@@ -64,6 +64,14 @@ fn truth_table_command_lists_boolean_rows() {
     );
 }
 
+#[test]
+fn circuit_command_draws_gate_tree() {
+    assert_eq!(
+        s("circuit(a and (b or c))"),
+        "OUT\n`- AND\n   |- a\n   `- OR\n      |- b\n      `- c\n"
+    );
+}
+
 // --- Implicit switching + delayed binding (Sub-Task 4) -------------------
 
 #[test]

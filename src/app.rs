@@ -178,6 +178,7 @@ fn mode_of(r: &EvalResult) -> Mode {
         EvalResult::Numeric(_) => Mode::Eager,
         EvalResult::Bool(_) => Mode::Logic,
         EvalResult::TruthTable(_) => Mode::Logic,
+        EvalResult::CircuitDiagram(_) => Mode::Logic,
         EvalResult::Matrix(_) => Mode::Matrix,
         EvalResult::Symbolic(_) => Mode::Lazy,
         EvalResult::Lambda(_) => Mode::Lambda,
@@ -483,6 +484,14 @@ fn cell_card(ui: &mut egui::Ui, index: usize, cell: &Cell) {
                 ui.add_space(6.0);
                 if let Some(EvalResult::TruthTable(table)) = &cell.result {
                     truth_table_view(ui, table);
+                } else if let Some(EvalResult::CircuitDiagram(diagram)) = &cell.result {
+                    ui.label(
+                        RichText::new(diagram.to_string())
+                            .color(LOGIC)
+                            .monospace()
+                            .size(15.0)
+                            .strong(),
+                    );
                 } else {
                     let color = if cell.mode == Mode::Error {
                         ERROR

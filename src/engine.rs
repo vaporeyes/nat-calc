@@ -6,7 +6,7 @@ use crate::derive::derive;
 use crate::error::{EvalError, EvalResultT};
 use crate::expand::expand;
 use crate::lambda::reduce_lambda;
-use crate::logic::{TruthTable, truth_table};
+use crate::logic::{CircuitDiagram, TruthTable, circuit_diagram, truth_table};
 use crate::numeric::{as_integer_exponent, bounded_div, pow_int};
 use crate::simplify::simplify;
 use bigdecimal::{BigDecimal, Zero};
@@ -18,6 +18,7 @@ pub enum EvalResult {
     Numeric(BigDecimal),
     Bool(bool),
     TruthTable(TruthTable),
+    CircuitDiagram(CircuitDiagram),
     Matrix(Vec<Vec<BigDecimal>>),
     Symbolic(Box<Expr>),
     /// A lambda abstraction in normal form (its own reduction mode).
@@ -30,6 +31,7 @@ impl std::fmt::Display for EvalResult {
             EvalResult::Numeric(n) => write!(f, "{}", n.normalized()),
             EvalResult::Bool(b) => write!(f, "{b}"),
             EvalResult::TruthTable(table) => write!(f, "{table}"),
+            EvalResult::CircuitDiagram(diagram) => write!(f, "{diagram}"),
             EvalResult::Matrix(rows) => {
                 write!(f, "[")?;
                 for (i, row) in rows.iter().enumerate() {
@@ -139,6 +141,9 @@ pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
             EvalResult::TruthTable(_) => Err(EvalError::TypeMismatch(
                 "unary minus cannot be applied to a truth table".into(),
             )),
+            EvalResult::CircuitDiagram(_) => Err(EvalError::TypeMismatch(
+                "unary minus cannot be applied to a circuit diagram".into(),
+            )),
             EvalResult::Symbolic(inner) | EvalResult::Lambda(inner) => {
                 classify(simplify(Expr::negate(*inner))?)
             }
@@ -200,6 +205,7 @@ pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
             classify(simplify(d)?)
         }
         Expr::Truth(e) => Ok(EvalResult::TruthTable(truth_table(e)?)),
+        Expr::Circuit(e) => Ok(EvalResult::CircuitDiagram(circuit_diagram(e)?)),
     }
 }
 
@@ -384,6 +390,9 @@ fn result_to_expr(r: EvalResult) -> EvalResultT<Expr> {
         EvalResult::Bool(b) => Ok(Expr::Bool(b)),
         EvalResult::TruthTable(_) => Err(EvalError::TypeMismatch(
             "a truth table cannot appear inside an expression".into(),
+        )),
+        EvalResult::CircuitDiagram(_) => Err(EvalError::TypeMismatch(
+            "a circuit diagram cannot appear inside an expression".into(),
         )),
         EvalResult::Symbolic(e) | EvalResult::Lambda(e) => Ok(*e),
         EvalResult::Matrix(_) => Err(EvalError::TypeMismatch(
