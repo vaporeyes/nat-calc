@@ -128,6 +128,12 @@ fn plot_command_supports_multiple_curves() {
     assert!(out.contains("(x ^ 2): 160 samples\n"));
 }
 
+#[test]
+fn plot_command_defaults_unbound_parameters() {
+    let out = s("plot(a * x, x, 0, 1)");
+    assert!(out.contains("(a * x): 160 samples\n"));
+}
+
 // --- Implicit switching + delayed binding (Sub-Task 4) -------------------
 
 #[test]

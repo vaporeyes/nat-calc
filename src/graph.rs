@@ -87,15 +87,30 @@ pub fn table(
 }
 
 pub fn plot(expr: &Expr, var: &str, start: &Expr, end: &Expr) -> EvalResultT<Plot2D> {
+    let params = default_params(expr, var);
+    plot_with_params(expr, var, start, end, &params)
+}
+
+pub fn plot_with_params(
+    expr: &Expr,
+    var: &str,
+    start: &Expr,
+    end: &Expr,
+    params: &[(String, f64)],
+) -> EvalResultT<Plot2D> {
     let start = eval_numeric(start, &HashMap::new())?;
     let end = eval_numeric(end, &HashMap::new())?;
     if !start.is_finite() || !end.is_finite() || start == end {
         return Err(EvalError::TypeMismatch("invalid plot range".into()));
     }
+    let base_env: HashMap<&str, f64> = params
+        .iter()
+        .map(|(name, value)| (name.as_str(), *value))
+        .collect();
     let curves = plot_exprs(expr)
         .into_iter()
         .map(|curve_expr| {
-            let mut env = HashMap::new();
+            let mut env = base_env.clone();
             let mut points = Vec::new();
             let denom = (PLOT_SAMPLES - 1) as f64;
             for i in 0..PLOT_SAMPLES {
@@ -119,6 +134,14 @@ pub fn plot(expr: &Expr, var: &str, start: &Expr, end: &Expr) -> EvalResultT<Plo
         x_max: end,
         curves,
     })
+}
+
+fn default_params(expr: &Expr, var: &str) -> Vec<(String, f64)> {
+    graph_vars(expr)
+        .into_iter()
+        .filter(|name| name != var)
+        .map(|name| (name, 1.0))
+        .collect()
 }
 
 pub fn graph_vars(expr: &Expr) -> Vec<String> {

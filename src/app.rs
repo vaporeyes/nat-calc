@@ -4,6 +4,7 @@
 use eframe::egui;
 use egui::{Color32, FontId, Frame, Margin, RichText, ScrollArea, Stroke};
 use nat_calc::ast::Expr;
+use nat_calc::graph::{graph_vars, plot_with_params};
 use nat_calc::logic::{eval_logic, logic_vars};
 use nat_calc::{Environment, EvalResult, eval, parse};
 use std::collections::HashMap;
@@ -66,6 +67,16 @@ struct Cell {
     result: Option<EvalResult>,
     logic_expr: Option<Expr>,
     logic_inputs: Vec<(String, bool)>,
+    plot_spec: Option<PlotSpec>,
+    plot_params: Vec<(String, f64)>,
+}
+
+#[derive(Clone)]
+struct PlotSpec {
+    expr: Expr,
+    var: String,
+    start: Expr,
+    end: Expr,
 }
 
 pub struct CalcApp {
@@ -111,11 +122,22 @@ impl CalcApp {
                         cell.logic_expr = None;
                         cell.logic_inputs.clear();
                     }
+                    if let Some(spec) = parsed.as_ref().and_then(plot_target) {
+                        cell.plot_spec = Some(spec);
+                        sync_plot_params(cell);
+                    } else {
+                        cell.plot_spec = None;
+                        cell.plot_params.clear();
+                    }
                 }
                 Err(e) => {
                     cell.mode = Mode::Error;
                     cell.output = e.to_string();
                     cell.result = None;
+                    cell.logic_expr = None;
+                    cell.logic_inputs.clear();
+                    cell.plot_spec = None;
+                    cell.plot_params.clear();
                 }
             }
         }
@@ -148,6 +170,8 @@ impl CalcApp {
             result: None,
             logic_expr: None,
             logic_inputs: Vec::new(),
+            plot_spec: None,
+            plot_params: Vec::new(),
         });
         self.draft.clear();
         self.focus_input = true;
@@ -186,6 +210,33 @@ impl CalcApp {
         }
         self.focus_input = true;
     }
+}
+
+fn plot_target(expr: &Expr) -> Option<PlotSpec> {
+    match expr {
+        Expr::Plot(e, var, start, end) => Some(PlotSpec {
+            expr: (**e).clone(),
+            var: var.clone(),
+            start: (**start).clone(),
+            end: (**end).clone(),
+        }),
+        _ => None,
+    }
+}
+
+fn sync_plot_params(cell: &mut Cell) {
+    let Some(spec) = &cell.plot_spec else {
+        return;
+    };
+    let old: HashMap<String, f64> = cell.plot_params.iter().cloned().collect();
+    cell.plot_params = graph_vars(&spec.expr)
+        .into_iter()
+        .filter(|name| name != &spec.var)
+        .map(|name| {
+            let value = old.get(&name).copied().unwrap_or(1.0);
+            (name, value)
+        })
+        .collect();
 }
 
 fn logic_target(expr: &Expr) -> Option<&Expr> {
@@ -534,8 +585,12 @@ fn cell_card(ui: &mut egui::Ui, index: usize, cell: &mut Cell) {
                             .size(15.0)
                             .strong(),
                     );
-                } else if let Some(EvalResult::Plot2D(plot)) = &cell.result {
-                    plot_view(ui, plot);
+                } else if let Some(EvalResult::Plot2D(plot)) = cell.result.clone() {
+                    if let Some(live_plot) = plot_controls(ui, cell) {
+                        plot_view(ui, &live_plot);
+                    } else {
+                        plot_view(ui, &plot);
+                    }
                 } else {
                     let color = if cell.mode == Mode::Error {
                         ERROR
@@ -553,6 +608,33 @@ fn cell_card(ui: &mut egui::Ui, index: usize, cell: &mut Cell) {
             });
             logic_controls(ui, cell);
         });
+}
+
+fn plot_controls(ui: &mut egui::Ui, cell: &mut Cell) -> Option<nat_calc::graph::Plot2D> {
+    let spec = cell.plot_spec.clone()?;
+    if cell.plot_params.is_empty() {
+        return None;
+    }
+    ui.vertical(|ui| {
+        ui.horizontal_wrapped(|ui| {
+            for (name, value) in &mut cell.plot_params {
+                ui.label(RichText::new(name.as_str()).color(DIM).monospace());
+                ui.add(
+                    egui::Slider::new(value, -10.0..=10.0)
+                        .step_by(0.1)
+                        .show_value(true),
+                );
+            }
+        });
+    });
+    plot_with_params(
+        &spec.expr,
+        &spec.var,
+        &spec.start,
+        &spec.end,
+        &cell.plot_params,
+    )
+    .ok()
 }
 
 fn plot_view(ui: &mut egui::Ui, plot: &nat_calc::graph::Plot2D) {
