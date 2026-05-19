@@ -3,7 +3,10 @@
 
 use eframe::egui;
 use egui::{Color32, FontId, Frame, Margin, RichText, ScrollArea, Stroke};
-use nat_calc::{Environment, EvalResult, eval};
+use nat_calc::ast::Expr;
+use nat_calc::logic::{eval_logic, logic_vars};
+use nat_calc::{Environment, EvalResult, eval, parse};
+use std::collections::HashMap;
 
 // --- Palette -------------------------------------------------------------
 
@@ -61,6 +64,8 @@ struct Cell {
     mode: Mode,
     output: String,
     result: Option<EvalResult>,
+    logic_expr: Option<Expr>,
+    logic_inputs: Vec<(String, bool)>,
 }
 
 pub struct CalcApp {
@@ -93,11 +98,19 @@ impl CalcApp {
     fn recompute(&mut self) {
         let mut env = Environment::new();
         for cell in &mut self.cells {
+            let parsed = parse(&cell.src).ok();
             match eval(&cell.src, &mut env) {
                 Ok(r) => {
                     cell.mode = mode_of(&r);
                     cell.output = r.to_string();
                     cell.result = Some(r);
+                    if let Some(expr) = parsed.as_ref().and_then(logic_target) {
+                        cell.logic_expr = Some(expr.clone());
+                        sync_logic_inputs(cell);
+                    } else {
+                        cell.logic_expr = None;
+                        cell.logic_inputs.clear();
+                    }
                 }
                 Err(e) => {
                     cell.mode = Mode::Error;
@@ -133,6 +146,8 @@ impl CalcApp {
             mode: Mode::Eager,
             output: String::new(),
             result: None,
+            logic_expr: None,
+            logic_inputs: Vec::new(),
         });
         self.draft.clear();
         self.focus_input = true;
@@ -171,6 +186,28 @@ impl CalcApp {
         }
         self.focus_input = true;
     }
+}
+
+fn logic_target(expr: &Expr) -> Option<&Expr> {
+    match expr {
+        Expr::Truth(e) | Expr::Circuit(e) => Some(e),
+        Expr::Bool(_) | Expr::Not(_) | Expr::Logic(_, _, _) => Some(expr),
+        _ => None,
+    }
+}
+
+fn sync_logic_inputs(cell: &mut Cell) {
+    let Some(expr) = &cell.logic_expr else {
+        return;
+    };
+    let old: HashMap<String, bool> = cell.logic_inputs.iter().cloned().collect();
+    cell.logic_inputs = logic_vars(expr)
+        .into_iter()
+        .map(|name| {
+            let value = old.get(&name).copied().unwrap_or(false);
+            (name, value)
+        })
+        .collect();
 }
 
 fn mode_of(r: &EvalResult) -> Mode {
@@ -448,7 +485,7 @@ impl eframe::App for CalcApp {
                     .auto_shrink([false, false])
                     .stick_to_bottom(true)
                     .show(ui, |ui| {
-                        for (i, cell) in self.cells.iter().enumerate() {
+                        for (i, cell) in self.cells.iter_mut().enumerate() {
                             cell_card(ui, i + 1, cell);
                             ui.add_space(10.0);
                         }
@@ -457,7 +494,7 @@ impl eframe::App for CalcApp {
     }
 }
 
-fn cell_card(ui: &mut egui::Ui, index: usize, cell: &Cell) {
+fn cell_card(ui: &mut egui::Ui, index: usize, cell: &mut Cell) {
     Frame::new()
         .fill(CARD)
         .stroke(Stroke::new(1.0, STROKE))
@@ -507,7 +544,33 @@ fn cell_card(ui: &mut egui::Ui, index: usize, cell: &Cell) {
                     );
                 }
             });
+            logic_controls(ui, cell);
         });
+}
+
+fn logic_controls(ui: &mut egui::Ui, cell: &mut Cell) {
+    let Some(expr) = &cell.logic_expr else {
+        return;
+    };
+    if cell.logic_inputs.is_empty() {
+        return;
+    }
+    ui.add_space(8.0);
+    ui.horizontal_wrapped(|ui| {
+        for (name, value) in &mut cell.logic_inputs {
+            ui.checkbox(value, RichText::new(name.as_str()).color(TEXT).monospace());
+        }
+        let env: HashMap<&str, bool> = cell
+            .logic_inputs
+            .iter()
+            .map(|(name, value)| (name.as_str(), *value))
+            .collect();
+        if let Ok(value) = eval_logic(expr, &env) {
+            ui.add_space(8.0);
+            ui.label(RichText::new("out").color(DIM).monospace());
+            bool_cell(ui, value);
+        }
+    });
 }
 
 fn truth_table_view(ui: &mut egui::Ui, table: &nat_calc::logic::TruthTable) {
