@@ -9,7 +9,7 @@ use bigdecimal::{BigDecimal, One, Zero};
 /// the result afterwards.
 pub fn derive(var: &str, expr: &Expr) -> EvalResultT<Expr> {
     match expr {
-        Expr::Number(_) => Ok(Expr::Number(BigDecimal::from(0))),
+        Expr::Number(_) | Expr::Bool(_) => Ok(Expr::Number(BigDecimal::from(0))),
         Expr::Variable(v) => Ok(Expr::Number(if v == var {
             BigDecimal::one()
         } else {
@@ -106,6 +106,9 @@ pub fn derive(var: &str, expr: &Expr) -> EvalResultT<Expr> {
 
         Expr::Lambda(..) | Expr::Apply(..) => Err(EvalError::TypeMismatch(
             "cannot differentiate a lambda term".into(),
+        )),
+        Expr::Not(_) | Expr::Logic(_, _, _) => Err(EvalError::TypeMismatch(
+            "cannot differentiate a logic expression".into(),
         )),
 
         // Differentiate through explicit command wrappers by differentiating

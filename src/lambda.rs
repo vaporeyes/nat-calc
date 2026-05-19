@@ -96,11 +96,12 @@ fn free_vars(e: &Expr, acc: &mut BTreeSet<String>) {
             inner.remove(p);
             acc.extend(inner);
         }
-        Expr::Apply(l, r) | Expr::Binary(_, l, r) => {
+        Expr::Apply(l, r) | Expr::Binary(_, l, r) | Expr::Logic(_, l, r) => {
             free_vars(l, acc);
             free_vars(r, acc);
         }
         Expr::Neg(x)
+        | Expr::Not(x)
         | Expr::Call(_, x)
         | Expr::Simplify(x)
         | Expr::Expand(x)
@@ -111,7 +112,7 @@ fn free_vars(e: &Expr, acc: &mut BTreeSet<String>) {
                 free_vars(el, acc);
             }
         }
-        Expr::Number(_) => {}
+        Expr::Number(_) | Expr::Bool(_) => {}
     }
 }
 
@@ -156,6 +157,12 @@ fn substitute(expr: Expr, var: &str, value: &Expr) -> Expr {
             Box::new(substitute(*r, var, value)),
         ),
         Expr::Neg(x) => Expr::Neg(Box::new(substitute(*x, var, value))),
+        Expr::Not(x) => Expr::Not(Box::new(substitute(*x, var, value))),
+        Expr::Logic(op, l, r) => Expr::Logic(
+            op,
+            Box::new(substitute(*l, var, value)),
+            Box::new(substitute(*r, var, value)),
+        ),
         Expr::Call(func, x) => {
             Expr::Call(func, Box::new(substitute(*x, var, value)))
         }
@@ -178,7 +185,7 @@ fn substitute(expr: Expr, var: &str, value: &Expr) -> Expr {
                 })
                 .collect(),
         ),
-        n @ Expr::Number(_) => n,
+        n @ Expr::Number(_) | n @ Expr::Bool(_) => n,
     }
 }
 

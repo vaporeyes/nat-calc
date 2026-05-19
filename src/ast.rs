@@ -13,6 +13,27 @@ pub enum BinaryOp {
     Pow,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum LogicOp {
+    And,
+    Or,
+    Xor,
+    Nand,
+    Nor,
+}
+
+impl LogicOp {
+    pub fn name(self) -> &'static str {
+        match self {
+            LogicOp::And => "and",
+            LogicOp::Or => "or",
+            LogicOp::Xor => "xor",
+            LogicOp::Nand => "nand",
+            LogicOp::Nor => "nor",
+        }
+    }
+}
+
 impl BinaryOp {
     pub fn symbol(self) -> char {
         match self {
@@ -54,12 +75,15 @@ impl Func {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Expr {
     Number(BigDecimal),
+    Bool(bool),
     Variable(String),
     /// Row-major matrix. Elements are `Expr` for structural uniformity; the
     /// engine requires them to reduce to numbers.
     Matrix(Vec<Vec<Expr>>),
     Neg(Box<Expr>),
     Binary(BinaryOp, Box<Expr>, Box<Expr>),
+    Not(Box<Expr>),
+    Logic(LogicOp, Box<Expr>, Box<Expr>),
     Call(Func, Box<Expr>),
     /// `\param. body` — single-parameter abstraction. Multi-parameter
     /// `\x y. e` is desugared by the parser to nested lambdas.
@@ -94,21 +118,30 @@ impl Expr {
         Expr::Call(f, Box::new(arg))
     }
 
+    pub fn not(e: Expr) -> Expr {
+        Expr::Not(Box::new(e))
+    }
+
+    pub fn logic(op: LogicOp, l: Expr, r: Expr) -> Expr {
+        Expr::Logic(op, Box::new(l), Box::new(r))
+    }
+
     /// Total node count, used to enforce `MAX_NODES` during rewrites.
     pub fn node_count(&self) -> usize {
         match self {
-            Expr::Number(_) | Expr::Variable(_) => 1,
+            Expr::Number(_) | Expr::Bool(_) | Expr::Variable(_) => 1,
             Expr::Matrix(rows) => {
                 1 + rows.iter().flatten().map(Expr::node_count).sum::<usize>()
             }
             Expr::Neg(e)
+            | Expr::Not(e)
             | Expr::Call(_, e)
             | Expr::Simplify(e)
             | Expr::Expand(e)
             | Expr::Assign(_, e)
             | Expr::Derive(_, e)
             | Expr::Lambda(_, e) => 1 + e.node_count(),
-            Expr::Binary(_, l, r) | Expr::Apply(l, r) => {
+            Expr::Binary(_, l, r) | Expr::Logic(_, l, r) | Expr::Apply(l, r) => {
                 1 + l.node_count() + r.node_count()
             }
         }
@@ -119,6 +152,7 @@ impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Expr::Number(n) => write!(f, "{}", n.normalized()),
+            Expr::Bool(b) => write!(f, "{b}"),
             Expr::Variable(v) => write!(f, "{v}"),
             Expr::Matrix(rows) => {
                 write!(f, "[")?;
@@ -137,6 +171,8 @@ impl fmt::Display for Expr {
             }
             Expr::Neg(e) => write!(f, "-({e})"),
             Expr::Binary(op, l, r) => write!(f, "({l} {} {r})", op.symbol()),
+            Expr::Not(e) => write!(f, "not({e})"),
+            Expr::Logic(op, l, r) => write!(f, "({l} {} {r})", op.name()),
             Expr::Call(func, a) => write!(f, "{}({a})", func.name()),
             Expr::Lambda(p, b) => write!(f, "(\\{p}. {b})"),
             Expr::Apply(g, a) => write!(f, "({g} {a})"),

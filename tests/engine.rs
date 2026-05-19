@@ -46,6 +46,16 @@ fn constant_folding_in_symbolic_context() {
     assert_eq!(s("1 + 2 + y"), "(y + 3)");
 }
 
+#[test]
+fn boolean_expressions_reduce_and_stay_symbolic() {
+    assert_eq!(s("true and false"), "false");
+    assert_eq!(s("true xor false"), "true");
+    assert_eq!(s("true nand true"), "false");
+    assert_eq!(s("false nor false"), "true");
+    assert_eq!(s("not true or false"), "false");
+    assert_eq!(s("a and true"), "(a and true)");
+}
+
 // --- Implicit switching + delayed binding (Sub-Task 4) -------------------
 
 #[test]

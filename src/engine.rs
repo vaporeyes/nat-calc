@@ -1,7 +1,7 @@
 // ABOUTME: The unified reduction engine: eager numeric path, lazy symbolic
 // ABOUTME: fallback, delayed binding, and memoized environment.
 
-use crate::ast::{BinaryOp, Expr};
+use crate::ast::{BinaryOp, Expr, LogicOp};
 use crate::derive::derive;
 use crate::error::{EvalError, EvalResultT};
 use crate::expand::expand;
@@ -15,6 +15,7 @@ use std::collections::{HashMap, HashSet};
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalResult {
     Numeric(BigDecimal),
+    Bool(bool),
     Matrix(Vec<Vec<BigDecimal>>),
     Symbolic(Box<Expr>),
     /// A lambda abstraction in normal form (its own reduction mode).
@@ -25,6 +26,7 @@ impl std::fmt::Display for EvalResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EvalResult::Numeric(n) => write!(f, "{}", n.normalized()),
+            EvalResult::Bool(b) => write!(f, "{b}"),
             EvalResult::Matrix(rows) => {
                 write!(f, "[")?;
                 for (i, row) in rows.iter().enumerate() {
@@ -95,6 +97,7 @@ impl Environment {
 pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
     match expr {
         Expr::Number(n) => Ok(EvalResult::Numeric(n.clone())),
+        Expr::Bool(b) => Ok(EvalResult::Bool(*b)),
 
         Expr::Variable(name) => {
             if let Some(cached) = env.cache.get(name) {
@@ -127,6 +130,9 @@ pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
         Expr::Neg(e) => match reduce(e, env)? {
             EvalResult::Numeric(n) => Ok(EvalResult::Numeric((-n).normalized())),
             EvalResult::Matrix(m) => Ok(EvalResult::Matrix(map_matrix(m, |v| -v))),
+            EvalResult::Bool(_) => Err(EvalError::TypeMismatch(
+                "unary minus cannot be applied to a boolean".into(),
+            )),
             EvalResult::Symbolic(inner) | EvalResult::Lambda(inner) => {
                 classify(simplify(Expr::negate(*inner))?)
             }
@@ -136,6 +142,17 @@ pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
             let lv = reduce(l, env)?;
             let rv = reduce(r, env)?;
             reduce_binary(*op, lv, rv)
+        }
+
+        Expr::Not(e) => match reduce(e, env)? {
+            EvalResult::Bool(b) => Ok(EvalResult::Bool(!b)),
+            other => classify(Expr::not(result_to_expr(other)?)),
+        },
+
+        Expr::Logic(op, l, r) => {
+            let lv = reduce(l, env)?;
+            let rv = reduce(r, env)?;
+            reduce_logic(*op, lv, rv)
         }
 
         Expr::Call(f, arg) => match reduce(arg, env)? {
@@ -230,6 +247,22 @@ fn numeric_op(
         },
     };
     Ok(EvalResult::Numeric(v.normalized()))
+}
+
+fn reduce_logic(op: LogicOp, lv: EvalResult, rv: EvalResult) -> EvalResultT<EvalResult> {
+    match (lv, rv) {
+        (EvalResult::Bool(a), EvalResult::Bool(b)) => {
+            let v = match op {
+                LogicOp::And => a && b,
+                LogicOp::Or => a || b,
+                LogicOp::Xor => a ^ b,
+                LogicOp::Nand => !(a && b),
+                LogicOp::Nor => !(a || b),
+            };
+            Ok(EvalResult::Bool(v))
+        }
+        (a, b) => classify(Expr::logic(op, result_to_expr(a)?, result_to_expr(b)?)),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -341,6 +374,7 @@ fn scalar_matrix(op: BinaryOp, s: BigDecimal, m: Mat) -> EvalResultT<EvalResult>
 fn result_to_expr(r: EvalResult) -> EvalResultT<Expr> {
     match r {
         EvalResult::Numeric(n) => Ok(Expr::Number(n)),
+        EvalResult::Bool(b) => Ok(Expr::Bool(b)),
         EvalResult::Symbolic(e) | EvalResult::Lambda(e) => Ok(*e),
         EvalResult::Matrix(_) => Err(EvalError::TypeMismatch(
             "a matrix cannot appear inside a symbolic expression".into(),
@@ -352,6 +386,7 @@ fn result_to_expr(r: EvalResult) -> EvalResultT<Expr> {
 fn classify(e: Expr) -> EvalResultT<EvalResult> {
     match e {
         Expr::Number(n) => Ok(EvalResult::Numeric(n)),
+        Expr::Bool(b) => Ok(EvalResult::Bool(b)),
         Expr::Matrix(rows) => {
             let mut out: Mat = Vec::with_capacity(rows.len());
             for row in &rows {

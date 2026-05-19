@@ -1,7 +1,7 @@
 // ABOUTME: Pratt (precedence-climbing) parser producing an Expr AST.
 // ABOUTME: Handles assignment, binary ops, unary minus, calls, matrices.
 
-use crate::ast::{BinaryOp, Expr, Func};
+use crate::ast::{BinaryOp, Expr, Func, LogicOp};
 use crate::error::{EvalError, EvalResultT};
 use crate::lexer::{Token, lex};
 use bigdecimal::BigDecimal;
@@ -21,6 +21,17 @@ fn is_builtin(name: &str) -> bool {
         name,
         "simplify" | "expand" | "derive" | "sin" | "cos" | "tan" | "exp" | "ln"
     )
+}
+
+fn logic_op(name: &str) -> Option<LogicOp> {
+    match name {
+        "and" => Some(LogicOp::And),
+        "or" => Some(LogicOp::Or),
+        "xor" => Some(LogicOp::Xor),
+        "nand" => Some(LogicOp::Nand),
+        "nor" => Some(LogicOp::Nor),
+        _ => None,
+    }
 }
 
 struct Parser {
@@ -77,6 +88,21 @@ impl Parser {
                 Token::Slash => (BinaryOp::Div, 20, 21),
                 // Right-associative: left bp > right bp.
                 Token::Caret => (BinaryOp::Pow, 31, 30),
+                Token::Ident(name) if logic_op(name).is_some() => {
+                    let op = logic_op(name).expect("guarded by is_some");
+                    let (l_bp, r_bp) = match op {
+                        LogicOp::And | LogicOp::Nand => (8, 9),
+                        LogicOp::Xor => (6, 7),
+                        LogicOp::Or | LogicOp::Nor => (4, 5),
+                    };
+                    if l_bp < min_bp {
+                        break;
+                    }
+                    self.pos += 1;
+                    let rhs = self.parse_expr(r_bp)?;
+                    lhs = Expr::logic(op, lhs, rhs);
+                    continue;
+                }
                 _ => break,
             };
             if l_bp < min_bp {
@@ -99,6 +125,13 @@ impl Parser {
             // Unary minus binds tighter than +,-,*,/ but looser than ^.
             let operand = self.parse_expr(25)?;
             return Ok(Expr::Neg(Box::new(operand)));
+        }
+        if let Token::Ident(name) = self.peek()
+            && name == "not"
+        {
+            self.pos += 1;
+            let operand = self.parse_expr(25)?;
+            return Ok(Expr::not(operand));
         }
         self.parse_postfix()
     }
@@ -159,6 +192,12 @@ impl Parser {
                 Ok(Expr::Number(n.normalized()))
             }
             Token::Ident(name) => {
+                if name == "true" {
+                    return Ok(Expr::Bool(true));
+                }
+                if name == "false" {
+                    return Ok(Expr::Bool(false));
+                }
                 // Built-in functions/commands keep their dedicated parsing;
                 // any other `name(...)` is generic application handled by
                 // `parse_postfix`, so just yield a variable here.

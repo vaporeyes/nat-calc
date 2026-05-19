@@ -18,6 +18,7 @@ const EAGER: Color32 = Color32::from_rgb(46, 196, 182); // numeric  -> teal
 const LAZY: Color32 = Color32::from_rgb(157, 124, 255); // symbolic -> violet
 const MATRIX: Color32 = Color32::from_rgb(240, 182, 92); // matrix  -> amber
 const LAMBDA: Color32 = Color32::from_rgb(120, 200, 255); // lambda -> sky
+const LOGIC: Color32 = Color32::from_rgb(92, 214, 132); // logic   -> green
 const ERROR: Color32 = Color32::from_rgb(240, 92, 104); // error    -> red
 
 // --- Model ---------------------------------------------------------------
@@ -28,6 +29,7 @@ enum Mode {
     Lazy,
     Matrix,
     Lambda,
+    Logic,
     Error,
 }
 
@@ -38,6 +40,7 @@ impl Mode {
             Mode::Lazy => LAZY,
             Mode::Matrix => MATRIX,
             Mode::Lambda => LAMBDA,
+            Mode::Logic => LOGIC,
             Mode::Error => ERROR,
         }
     }
@@ -47,6 +50,7 @@ impl Mode {
             Mode::Lazy => "LAZY",
             Mode::Matrix => "MATRIX",
             Mode::Lambda => "LAMBDA",
+            Mode::Logic => "LOGIC",
             Mode::Error => "ERROR",
         }
     }
@@ -168,6 +172,7 @@ impl CalcApp {
 fn mode_of(r: &EvalResult) -> Mode {
     match r {
         EvalResult::Numeric(_) => Mode::Eager,
+        EvalResult::Bool(_) => Mode::Logic,
         EvalResult::Matrix(_) => Mode::Matrix,
         EvalResult::Symbolic(_) => Mode::Lazy,
         EvalResult::Lambda(_) => Mode::Lambda,

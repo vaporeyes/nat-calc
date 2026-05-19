@@ -32,7 +32,7 @@ pub fn simplify(expr: Expr) -> EvalResultT<Expr> {
 /// One bottom-up rewrite pass: simplify children, then the node itself.
 fn pass(expr: Expr) -> EvalResultT<Expr> {
     let with_children = match expr {
-        Expr::Number(_) | Expr::Variable(_) => expr,
+        Expr::Number(_) | Expr::Bool(_) | Expr::Variable(_) => expr,
         Expr::Matrix(rows) => {
             let mut new_rows = Vec::with_capacity(rows.len());
             for row in rows {
@@ -45,7 +45,11 @@ fn pass(expr: Expr) -> EvalResultT<Expr> {
             Expr::Matrix(new_rows)
         }
         Expr::Neg(e) => Expr::Neg(Box::new(pass(*e)?)),
+        Expr::Not(e) => Expr::Not(Box::new(pass(*e)?)),
         Expr::Call(f, e) => Expr::Call(f, Box::new(pass(*e)?)),
+        Expr::Logic(op, l, r) => {
+            Expr::Logic(op, Box::new(pass(*l)?), Box::new(pass(*r)?))
+        }
         Expr::Binary(op, l, r) => {
             Expr::Binary(op, Box::new(pass(*l)?), Box::new(pass(*r)?))
         }
