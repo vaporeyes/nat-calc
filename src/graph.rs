@@ -92,26 +92,32 @@ pub fn plot(expr: &Expr, var: &str, start: &Expr, end: &Expr) -> EvalResultT<Plo
     if !start.is_finite() || !end.is_finite() || start == end {
         return Err(EvalError::TypeMismatch("invalid plot range".into()));
     }
-    let mut env = HashMap::new();
-    let mut points = Vec::new();
-    let denom = (PLOT_SAMPLES - 1) as f64;
-    for i in 0..PLOT_SAMPLES {
-        let t = i as f64 / denom;
-        let x = start + (end - start) * t;
-        env.insert(var, x);
-        let y = eval_numeric(expr, &env)?;
-        if y.is_finite() {
-            points.push((x, y));
-        }
-    }
+    let curves = plot_exprs(expr)
+        .into_iter()
+        .map(|curve_expr| {
+            let mut env = HashMap::new();
+            let mut points = Vec::new();
+            let denom = (PLOT_SAMPLES - 1) as f64;
+            for i in 0..PLOT_SAMPLES {
+                let t = i as f64 / denom;
+                let x = start + (end - start) * t;
+                env.insert(var, x);
+                let y = eval_numeric(curve_expr, &env)?;
+                if y.is_finite() {
+                    points.push((x, y));
+                }
+            }
+            Ok(PlotCurve {
+                label: curve_expr.to_string(),
+                points,
+            })
+        })
+        .collect::<EvalResultT<Vec<_>>>()?;
     Ok(Plot2D {
         var: var.to_string(),
         x_min: start,
         x_max: end,
-        curves: vec![PlotCurve {
-            label: expr.to_string(),
-            points,
-        }],
+        curves,
     })
 }
 
@@ -170,6 +176,13 @@ fn collect_vars(expr: &Expr, vars: &mut BTreeSet<String>) {
             collect_vars(r, vars);
         }
         _ => {}
+    }
+}
+
+fn plot_exprs(expr: &Expr) -> Vec<&Expr> {
+    match expr {
+        Expr::Matrix(rows) if rows.len() == 1 => rows[0].iter().collect(),
+        _ => vec![expr],
     }
 }
 

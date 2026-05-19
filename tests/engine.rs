@@ -121,6 +121,13 @@ fn plot_command_returns_sampled_plot() {
     assert!(out.contains("(x ^ 2): 160 samples\n"));
 }
 
+#[test]
+fn plot_command_supports_multiple_curves() {
+    let out = s("plot([x, x ^ 2], x, -2, 2)");
+    assert!(out.contains("x: 160 samples\n"));
+    assert!(out.contains("(x ^ 2): 160 samples\n"));
+}
+
 // --- Implicit switching + delayed binding (Sub-Task 4) -------------------
 
 #[test]
