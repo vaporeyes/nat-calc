@@ -97,6 +97,7 @@ pub enum Expr {
     Derive(String, Box<Expr>),
     Truth(Box<Expr>),
     Circuit(Box<Expr>),
+    LogicSimplify(Box<Expr>),
 }
 
 impl Expr {
@@ -144,6 +145,7 @@ impl Expr {
             | Expr::Derive(_, e)
             | Expr::Truth(e)
             | Expr::Circuit(e)
+            | Expr::LogicSimplify(e)
             | Expr::Lambda(_, e) => 1 + e.node_count(),
             Expr::Binary(_, l, r) | Expr::Logic(_, l, r) | Expr::Apply(l, r) => {
                 1 + l.node_count() + r.node_count()
@@ -186,6 +188,7 @@ impl fmt::Display for Expr {
             Expr::Derive(v, e) => write!(f, "derive({v}, {e})"),
             Expr::Truth(e) => write!(f, "truth({e})"),
             Expr::Circuit(e) => write!(f, "circuit({e})"),
+            Expr::LogicSimplify(e) => write!(f, "logic_simplify({e})"),
         }
     }
 }

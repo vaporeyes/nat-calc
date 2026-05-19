@@ -113,7 +113,11 @@ pub fn derive(var: &str, expr: &Expr) -> EvalResultT<Expr> {
 
         // Differentiate through explicit command wrappers by differentiating
         // their target. Nested `derive` (higher-order) is not supported.
-        Expr::Simplify(e) | Expr::Expand(e) | Expr::Truth(e) | Expr::Circuit(e) => {
+        Expr::Simplify(e)
+        | Expr::Expand(e)
+        | Expr::Truth(e)
+        | Expr::Circuit(e)
+        | Expr::LogicSimplify(e) => {
             derive(var, e)
         }
         Expr::Assign(_, e) => derive(var, e),

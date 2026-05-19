@@ -72,6 +72,15 @@ fn circuit_command_draws_gate_tree() {
     );
 }
 
+#[test]
+fn logic_simplify_applies_boolean_identities() {
+    assert_eq!(s("logic_simplify(a and true)"), "a");
+    assert_eq!(s("logic_simplify(a or false)"), "a");
+    assert_eq!(s("logic_simplify(a xor a)"), "false");
+    assert_eq!(s("logic_simplify(not not a)"), "a");
+    assert_eq!(s("logic_simplify(not (a and b))"), "(not(a) or not(b))");
+}
+
 // --- Implicit switching + delayed binding (Sub-Task 4) -------------------
 
 #[test]

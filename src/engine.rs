@@ -6,7 +6,9 @@ use crate::derive::derive;
 use crate::error::{EvalError, EvalResultT};
 use crate::expand::expand;
 use crate::lambda::reduce_lambda;
-use crate::logic::{CircuitDiagram, TruthTable, circuit_diagram, truth_table};
+use crate::logic::{
+    CircuitDiagram, TruthTable, circuit_diagram, simplify_logic, truth_table,
+};
 use crate::numeric::{as_integer_exponent, bounded_div, pow_int};
 use crate::simplify::simplify;
 use bigdecimal::{BigDecimal, Zero};
@@ -206,6 +208,7 @@ pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
         }
         Expr::Truth(e) => Ok(EvalResult::TruthTable(truth_table(e)?)),
         Expr::Circuit(e) => Ok(EvalResult::CircuitDiagram(circuit_diagram(e)?)),
+        Expr::LogicSimplify(e) => classify(simplify_logic(e)?),
     }
 }
 

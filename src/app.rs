@@ -190,7 +190,7 @@ impl CalcApp {
 
 fn logic_target(expr: &Expr) -> Option<&Expr> {
     match expr {
-        Expr::Truth(e) | Expr::Circuit(e) => Some(e),
+        Expr::Truth(e) | Expr::Circuit(e) | Expr::LogicSimplify(e) => Some(e),
         Expr::Bool(_) | Expr::Not(_) | Expr::Logic(_, _, _) => Some(expr),
         _ => None,
     }

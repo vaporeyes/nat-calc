@@ -108,6 +108,7 @@ fn free_vars(e: &Expr, acc: &mut BTreeSet<String>) {
         | Expr::Assign(_, x)
         | Expr::Truth(x)
         | Expr::Circuit(x)
+        | Expr::LogicSimplify(x)
         | Expr::Derive(_, x) => free_vars(x, acc),
         Expr::Matrix(rows) => {
             for el in rows.iter().flatten() {
@@ -174,6 +175,7 @@ fn substitute(expr: Expr, var: &str, value: &Expr) -> Expr {
         Expr::Expand(x) => Expr::Expand(Box::new(substitute(*x, var, value))),
         Expr::Truth(x) => Expr::Truth(Box::new(substitute(*x, var, value))),
         Expr::Circuit(x) => Expr::Circuit(Box::new(substitute(*x, var, value))),
+        Expr::LogicSimplify(x) => Expr::LogicSimplify(Box::new(substitute(*x, var, value))),
         Expr::Derive(v, x) => {
             Expr::Derive(v, Box::new(substitute(*x, var, value)))
         }

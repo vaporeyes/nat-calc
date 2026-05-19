@@ -69,6 +69,83 @@ pub fn truth_table(expr: &Expr) -> EvalResultT<TruthTable> {
     Ok(TruthTable { vars, rows })
 }
 
+pub fn simplify_logic(expr: &Expr) -> EvalResultT<Expr> {
+    validate_logic_expr(expr)?;
+    Ok(simplify_logic_inner(expr))
+}
+
+fn simplify_logic_inner(expr: &Expr) -> Expr {
+    match expr {
+        Expr::Bool(_) | Expr::Variable(_) => expr.clone(),
+        Expr::Not(e) => simplify_not(simplify_logic_inner(e)),
+        Expr::Logic(op, l, r) => {
+            let left = simplify_logic_inner(l);
+            let right = simplify_logic_inner(r);
+            simplify_logic_node(*op, left, right)
+        }
+        _ => expr.clone(),
+    }
+}
+
+fn simplify_not(expr: Expr) -> Expr {
+    match expr {
+        Expr::Bool(b) => Expr::Bool(!b),
+        Expr::Not(inner) => *inner,
+        Expr::Logic(LogicOp::And, l, r) => simplify_logic_node(
+            LogicOp::Or,
+            simplify_not(*l),
+            simplify_not(*r),
+        ),
+        Expr::Logic(LogicOp::Or, l, r) => simplify_logic_node(
+            LogicOp::And,
+            simplify_not(*l),
+            simplify_not(*r),
+        ),
+        other => Expr::not(other),
+    }
+}
+
+fn simplify_logic_node(op: LogicOp, left: Expr, right: Expr) -> Expr {
+    if let (Expr::Bool(a), Expr::Bool(b)) = (&left, &right) {
+        let mut env = HashMap::new();
+        env.insert("a", *a);
+        env.insert("b", *b);
+        return Expr::Bool(
+            eval_logic(
+                &Expr::logic(op, Expr::Variable("a".into()), Expr::Variable("b".into())),
+                &env,
+            )
+            .expect("boolean operands are valid"),
+        );
+    }
+    match op {
+        LogicOp::And => match (&left, &right) {
+            (Expr::Bool(false), _) | (_, Expr::Bool(false)) => Expr::Bool(false),
+            (Expr::Bool(true), _) => right,
+            (_, Expr::Bool(true)) => left,
+            _ if left == right => left,
+            _ => Expr::logic(op, left, right),
+        },
+        LogicOp::Or => match (&left, &right) {
+            (Expr::Bool(true), _) | (_, Expr::Bool(true)) => Expr::Bool(true),
+            (Expr::Bool(false), _) => right,
+            (_, Expr::Bool(false)) => left,
+            _ if left == right => left,
+            _ => Expr::logic(op, left, right),
+        },
+        LogicOp::Xor => match (&left, &right) {
+            (Expr::Bool(false), _) => right,
+            (_, Expr::Bool(false)) => left,
+            (Expr::Bool(true), _) => simplify_not(right),
+            (_, Expr::Bool(true)) => simplify_not(left),
+            _ if left == right => Expr::Bool(false),
+            _ => Expr::logic(op, left, right),
+        },
+        LogicOp::Nand => simplify_not(simplify_logic_node(LogicOp::And, left, right)),
+        LogicOp::Nor => simplify_not(simplify_logic_node(LogicOp::Or, left, right)),
+    }
+}
+
 fn circuit_lines(expr: &Expr, prefix: &str, last: bool, lines: &mut Vec<String>) {
     let branch = if last { "`- " } else { "|- " };
     lines.push(format!("{prefix}{branch}{}", gate_label(expr)));
@@ -144,7 +221,9 @@ fn collect_logic_vars(expr: &Expr, vars: &mut BTreeSet<String>) {
         Expr::Variable(name) => {
             vars.insert(name.clone());
         }
-        Expr::Not(e) | Expr::Truth(e) | Expr::Circuit(e) => collect_logic_vars(e, vars),
+        Expr::Not(e) | Expr::Truth(e) | Expr::Circuit(e) | Expr::LogicSimplify(e) => {
+            collect_logic_vars(e, vars)
+        }
         Expr::Logic(_, l, r) => {
             collect_logic_vars(l, vars);
             collect_logic_vars(r, vars);
