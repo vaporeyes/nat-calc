@@ -5,7 +5,7 @@ use crate::ast::{BinaryOp, Expr, LogicOp};
 use crate::derive::derive;
 use crate::error::{EvalError, EvalResultT};
 use crate::expand::expand;
-use crate::graph::{ValueTable, table};
+use crate::graph::{Plot2D, ValueTable, plot, table};
 use crate::lambda::reduce_lambda;
 use crate::logic::{
     AdderResult, CircuitDiagram, EquivResult, KMap, TruthTable, adder_preset,
@@ -27,6 +27,7 @@ pub enum EvalResult {
     KMap(KMap),
     AdderResult(AdderResult),
     ValueTable(ValueTable),
+    Plot2D(Plot2D),
     Matrix(Vec<Vec<BigDecimal>>),
     Symbolic(Box<Expr>),
     /// A lambda abstraction in normal form (its own reduction mode).
@@ -44,6 +45,7 @@ impl std::fmt::Display for EvalResult {
             EvalResult::KMap(map) => write!(f, "{map}"),
             EvalResult::AdderResult(result) => write!(f, "{result}"),
             EvalResult::ValueTable(table) => write!(f, "{table}"),
+            EvalResult::Plot2D(plot) => write!(f, "{plot}"),
             EvalResult::Matrix(rows) => {
                 write!(f, "[")?;
                 for (i, row) in rows.iter().enumerate() {
@@ -168,6 +170,9 @@ pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
             EvalResult::ValueTable(_) => Err(EvalError::TypeMismatch(
                 "unary minus cannot be applied to a value table".into(),
             )),
+            EvalResult::Plot2D(_) => Err(EvalError::TypeMismatch(
+                "unary minus cannot be applied to a plot".into(),
+            )),
             EvalResult::Symbolic(inner) | EvalResult::Lambda(inner) => {
                 classify(simplify(Expr::negate(*inner))?)
             }
@@ -259,6 +264,9 @@ pub fn reduce(expr: &Expr, env: &mut Environment) -> EvalResultT<EvalResult> {
         }
         Expr::Table(e, var, start, end, step) => {
             Ok(EvalResult::ValueTable(table(e, var, start, end, step)?))
+        }
+        Expr::Plot(e, var, start, end) => {
+            Ok(EvalResult::Plot2D(plot(e, var, start, end)?))
         }
     }
 }
@@ -459,6 +467,9 @@ fn result_to_expr(r: EvalResult) -> EvalResultT<Expr> {
         )),
         EvalResult::ValueTable(_) => Err(EvalError::TypeMismatch(
             "a value table cannot appear inside an expression".into(),
+        )),
+        EvalResult::Plot2D(_) => Err(EvalError::TypeMismatch(
+            "a plot cannot appear inside an expression".into(),
         )),
         EvalResult::Symbolic(e) | EvalResult::Lambda(e) => Ok(*e),
         EvalResult::Matrix(_) => Err(EvalError::TypeMismatch(

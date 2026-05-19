@@ -7,11 +7,42 @@ use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 
 const MAX_SAMPLES: usize = 1_000;
+const PLOT_SAMPLES: usize = 160;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ValueTable {
     pub var: String,
     pub rows: Vec<(f64, f64)>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Plot2D {
+    pub var: String,
+    pub x_min: f64,
+    pub x_max: f64,
+    pub curves: Vec<PlotCurve>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PlotCurve {
+    pub label: String,
+    pub points: Vec<(f64, f64)>,
+}
+
+impl fmt::Display for Plot2D {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "plot {} {}..{}",
+            self.var,
+            fmt_num(self.x_min),
+            fmt_num(self.x_max)
+        )?;
+        for curve in &self.curves {
+            writeln!(f, "{}: {} samples", curve.label, curve.points.len())?;
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Display for ValueTable {
@@ -52,6 +83,35 @@ pub fn table(
     Ok(ValueTable {
         var: var.to_string(),
         rows,
+    })
+}
+
+pub fn plot(expr: &Expr, var: &str, start: &Expr, end: &Expr) -> EvalResultT<Plot2D> {
+    let start = eval_numeric(start, &HashMap::new())?;
+    let end = eval_numeric(end, &HashMap::new())?;
+    if !start.is_finite() || !end.is_finite() || start == end {
+        return Err(EvalError::TypeMismatch("invalid plot range".into()));
+    }
+    let mut env = HashMap::new();
+    let mut points = Vec::new();
+    let denom = (PLOT_SAMPLES - 1) as f64;
+    for i in 0..PLOT_SAMPLES {
+        let t = i as f64 / denom;
+        let x = start + (end - start) * t;
+        env.insert(var, x);
+        let y = eval_numeric(expr, &env)?;
+        if y.is_finite() {
+            points.push((x, y));
+        }
+    }
+    Ok(Plot2D {
+        var: var.to_string(),
+        x_min: start,
+        x_max: end,
+        curves: vec![PlotCurve {
+            label: expr.to_string(),
+            points,
+        }],
     })
 }
 

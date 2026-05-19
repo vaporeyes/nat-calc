@@ -118,6 +118,7 @@ pub fn derive(var: &str, expr: &Expr) -> EvalResultT<Expr> {
             "cannot differentiate an adder preset".into(),
         )),
         Expr::Table(e, _, _, _, _) => derive(var, e),
+        Expr::Plot(e, _, _, _) => derive(var, e),
 
         // Differentiate through explicit command wrappers by differentiating
         // their target. Nested `derive` (higher-order) is not supported.

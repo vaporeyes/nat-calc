@@ -220,6 +220,7 @@ fn mode_of(r: &EvalResult) -> Mode {
         EvalResult::KMap(_) => Mode::Logic,
         EvalResult::AdderResult(_) => Mode::Logic,
         EvalResult::ValueTable(_) => Mode::Eager,
+        EvalResult::Plot2D(_) => Mode::Eager,
         EvalResult::Matrix(_) => Mode::Matrix,
         EvalResult::Symbolic(_) => Mode::Lazy,
         EvalResult::Lambda(_) => Mode::Lambda,

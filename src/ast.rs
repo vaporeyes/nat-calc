@@ -103,6 +103,7 @@ pub enum Expr {
     HalfAdder(Box<Expr>, Box<Expr>),
     FullAdder(Box<Expr>, Box<Expr>, Box<Expr>),
     Table(Box<Expr>, String, Box<Expr>, Box<Expr>, Box<Expr>),
+    Plot(Box<Expr>, String, Box<Expr>, Box<Expr>),
 }
 
 impl Expr {
@@ -164,6 +165,7 @@ impl Expr {
             Expr::Table(e, _, start, end, step) => {
                 1 + e.node_count() + start.node_count() + end.node_count() + step.node_count()
             }
+            Expr::Plot(e, _, start, end) => 1 + e.node_count() + start.node_count() + end.node_count(),
         }
     }
 }
@@ -215,6 +217,9 @@ impl fmt::Display for Expr {
             Expr::FullAdder(a, b, c) => write!(f, "full_adder({a}, {b}, {c})"),
             Expr::Table(e, var, start, end, step) => {
                 write!(f, "table({e}, {var}, {start}, {end}, {step})")
+            }
+            Expr::Plot(e, var, start, end) => {
+                write!(f, "plot({e}, {var}, {start}, {end})")
             }
         }
     }

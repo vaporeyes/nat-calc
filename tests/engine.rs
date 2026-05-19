@@ -114,6 +114,13 @@ fn table_command_samples_numeric_expression() {
     );
 }
 
+#[test]
+fn plot_command_returns_sampled_plot() {
+    let out = s("plot(x ^ 2, x, -2, 2)");
+    assert!(out.starts_with("plot x -2..2\n"));
+    assert!(out.contains("(x ^ 2): 160 samples\n"));
+}
+
 // --- Implicit switching + delayed binding (Sub-Task 4) -------------------
 
 #[test]
