@@ -60,6 +60,7 @@ struct Cell {
     src: String,
     mode: Mode,
     output: String,
+    result: Option<EvalResult>,
 }
 
 pub struct CalcApp {
@@ -96,10 +97,12 @@ impl CalcApp {
                 Ok(r) => {
                     cell.mode = mode_of(&r);
                     cell.output = r.to_string();
+                    cell.result = Some(r);
                 }
                 Err(e) => {
                     cell.mode = Mode::Error;
                     cell.output = e.to_string();
+                    cell.result = None;
                 }
             }
         }
@@ -129,6 +132,7 @@ impl CalcApp {
             src,
             mode: Mode::Eager,
             output: String::new(),
+            result: None,
         });
         self.draft.clear();
         self.focus_input = true;
@@ -477,18 +481,52 @@ fn cell_card(ui: &mut egui::Ui, index: usize, cell: &Cell) {
             ui.horizontal(|ui| {
                 badge(ui, cell.mode);
                 ui.add_space(6.0);
-                let color = if cell.mode == Mode::Error {
-                    ERROR
+                if let Some(EvalResult::TruthTable(table)) = &cell.result {
+                    truth_table_view(ui, table);
                 } else {
-                    cell.mode.color()
-                };
-                ui.label(
-                    RichText::new(&cell.output)
-                        .color(color)
-                        .monospace()
-                        .size(16.0)
-                        .strong(),
-                );
+                    let color = if cell.mode == Mode::Error {
+                        ERROR
+                    } else {
+                        cell.mode.color()
+                    };
+                    ui.label(
+                        RichText::new(&cell.output)
+                            .color(color)
+                            .monospace()
+                            .size(16.0)
+                            .strong(),
+                    );
+                }
             });
         });
+}
+
+fn truth_table_view(ui: &mut egui::Ui, table: &nat_calc::logic::TruthTable) {
+    egui::Grid::new(ui.next_auto_id())
+        .spacing(egui::vec2(16.0, 4.0))
+        .striped(true)
+        .show(ui, |ui| {
+            for name in &table.vars {
+                ui.label(RichText::new(name).color(DIM).monospace().strong());
+            }
+            ui.label(RichText::new("out").color(LOGIC).monospace().strong());
+            ui.end_row();
+            for (values, out) in &table.rows {
+                for value in values {
+                    bool_cell(ui, *value);
+                }
+                bool_cell(ui, *out);
+                ui.end_row();
+            }
+        });
+}
+
+fn bool_cell(ui: &mut egui::Ui, value: bool) {
+    let color = if value { LOGIC } else { DIM };
+    ui.label(
+        RichText::new(if value { "1" } else { "0" })
+            .color(color)
+            .monospace()
+            .strong(),
+    );
 }
