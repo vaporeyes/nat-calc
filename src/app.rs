@@ -534,6 +534,8 @@ fn cell_card(ui: &mut egui::Ui, index: usize, cell: &mut Cell) {
                             .size(15.0)
                             .strong(),
                     );
+                } else if let Some(EvalResult::Plot2D(plot)) = &cell.result {
+                    plot_view(ui, plot);
                 } else {
                     let color = if cell.mode == Mode::Error {
                         ERROR
@@ -551,6 +553,92 @@ fn cell_card(ui: &mut egui::Ui, index: usize, cell: &mut Cell) {
             });
             logic_controls(ui, cell);
         });
+}
+
+fn plot_view(ui: &mut egui::Ui, plot: &nat_calc::graph::Plot2D) {
+    let width = ui.available_width().clamp(320.0, 720.0);
+    let size = egui::vec2(width, 260.0);
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+    painter.rect_filled(rect, 8.0, PANEL);
+    painter.rect_stroke(
+        rect,
+        8.0,
+        Stroke::new(1.0, STROKE),
+        egui::StrokeKind::Inside,
+    );
+
+    let bounds = plot_bounds(plot);
+    let to_screen = |x: f64, y: f64| {
+        let tx = ((x - bounds.0) / (bounds.1 - bounds.0)) as f32;
+        let ty = ((y - bounds.2) / (bounds.3 - bounds.2)) as f32;
+        egui::pos2(
+            rect.left() + tx * rect.width(),
+            rect.bottom() - ty * rect.height(),
+        )
+    };
+
+    if bounds.0 <= 0.0 && bounds.1 >= 0.0 {
+        let a = to_screen(0.0, bounds.2);
+        let b = to_screen(0.0, bounds.3);
+        painter.line_segment([a, b], Stroke::new(1.0, DIM.linear_multiply(0.55)));
+    }
+    if bounds.2 <= 0.0 && bounds.3 >= 0.0 {
+        let a = to_screen(bounds.0, 0.0);
+        let b = to_screen(bounds.1, 0.0);
+        painter.line_segment([a, b], Stroke::new(1.0, DIM.linear_multiply(0.55)));
+    }
+
+    let colors = [EAGER, LAZY, MATRIX, LOGIC];
+    for (i, curve) in plot.curves.iter().enumerate() {
+        let color = colors[i % colors.len()];
+        for pair in curve.points.windows(2) {
+            let a = to_screen(pair[0].0, pair[0].1);
+            let b = to_screen(pair[1].0, pair[1].1);
+            painter.line_segment([a, b], Stroke::new(2.0, color));
+        }
+    }
+
+    let label = format!(
+        "{}: {}..{}",
+        plot.var,
+        graph_num(bounds.0),
+        graph_num(bounds.1)
+    );
+    painter.text(
+        rect.left_top() + egui::vec2(10.0, 8.0),
+        egui::Align2::LEFT_TOP,
+        label,
+        FontId::monospace(12.0),
+        DIM,
+    );
+}
+
+fn plot_bounds(plot: &nat_calc::graph::Plot2D) -> (f64, f64, f64, f64) {
+    let mut y_min = f64::INFINITY;
+    let mut y_max = f64::NEG_INFINITY;
+    for (_, y) in plot.curves.iter().flat_map(|curve| curve.points.iter()) {
+        y_min = y_min.min(*y);
+        y_max = y_max.max(*y);
+    }
+    if !y_min.is_finite() || !y_max.is_finite() {
+        y_min = -1.0;
+        y_max = 1.0;
+    }
+    if (y_max - y_min).abs() < 1e-9 {
+        y_min -= 1.0;
+        y_max += 1.0;
+    }
+    let pad = (y_max - y_min) * 0.08;
+    (plot.x_min, plot.x_max, y_min - pad, y_max + pad)
+}
+
+fn graph_num(value: f64) -> String {
+    let rounded = (value * 100.0).round() / 100.0;
+    format!("{rounded:.2}")
+        .trim_end_matches('0')
+        .trim_end_matches('.')
+        .to_string()
 }
 
 fn logic_controls(ui: &mut egui::Ui, cell: &mut Cell) {
