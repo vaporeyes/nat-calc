@@ -90,6 +90,22 @@ fn equivalence_reports_result_and_counterexample() {
     );
 }
 
+#[test]
+fn kmap_and_adder_presets_render_logic_outputs() {
+    assert_eq!(
+        s("kmap(a, b, a and b)"),
+        "KMAP a b\na\\b 0 1\n0 0 0\n1 0 1\n"
+    );
+    assert_eq!(
+        s("half_adder(a, b)"),
+        "half_adder\nsum = (a xor b)\ncarry = (a and b)\n"
+    );
+    assert_eq!(
+        s("full_adder(a, b, cin)"),
+        "full_adder\nsum = ((a xor b) xor cin)\ncarry = ((a and b) or ((a xor b) and cin))\n"
+    );
+}
+
 // --- Implicit switching + delayed binding (Sub-Task 4) -------------------
 
 #[test]

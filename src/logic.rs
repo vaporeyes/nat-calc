@@ -24,6 +24,49 @@ pub struct EquivResult {
     pub counterexample: Option<Vec<bool>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KMap {
+    pub vars: Vec<String>,
+    pub row_vars: Vec<String>,
+    pub col_vars: Vec<String>,
+    pub rows: Vec<(String, Vec<(String, bool)>)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdderResult {
+    pub name: String,
+    pub outputs: Vec<(String, Expr)>,
+}
+
+impl fmt::Display for KMap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "KMAP {}", self.vars.join(" "))?;
+        write!(f, "{}\\{}", self.row_vars.join(""), self.col_vars.join(""))?;
+        for (col, _) in self.rows.first().map(|(_, cols)| cols).into_iter().flatten() {
+            write!(f, " {col}")?;
+        }
+        writeln!(f)?;
+        for (row, cols) in &self.rows {
+            write!(f, "{row}")?;
+            for (_, value) in cols {
+                write!(f, " {}", bool_digit(*value))?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for AdderResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{}", self.name)?;
+        for (name, expr) in &self.outputs {
+            writeln!(f, "{name} = {expr}")?;
+        }
+        Ok(())
+    }
+}
+
 impl fmt::Display for EquivResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.equivalent {
@@ -125,6 +168,64 @@ pub fn equivalence(left: &Expr, right: &Expr) -> EvalResultT<EquivResult> {
         vars,
         counterexample: None,
     })
+}
+
+pub fn kmap(explicit_vars: &[String], expr: &Expr) -> EvalResultT<KMap> {
+    validate_logic_expr(expr)?;
+    let vars = if explicit_vars.is_empty() {
+        logic_vars(expr)
+    } else {
+        explicit_vars.to_vec()
+    };
+    if vars.is_empty() || vars.len() > 4 {
+        return Err(EvalError::TypeMismatch(
+            "kmap expects one to four variables".into(),
+        ));
+    }
+    let row_count = vars.len() / 2;
+    let row_vars = vars[..row_count].to_vec();
+    let col_vars = vars[row_count..].to_vec();
+    let row_labels = gray_labels(row_vars.len());
+    let col_labels = gray_labels(col_vars.len());
+    let mut rows = Vec::new();
+    for row in &row_labels {
+        let mut cols = Vec::new();
+        for col in &col_labels {
+            let bits = format!("{row}{col}");
+            let mut env = HashMap::new();
+            for (name, bit) in vars.iter().zip(bits.chars()) {
+                env.insert(name.as_str(), bit == '1');
+            }
+            cols.push((col.clone(), eval_logic(expr, &env)?));
+        }
+        rows.push((row.clone(), cols));
+    }
+    Ok(KMap {
+        vars,
+        row_vars,
+        col_vars,
+        rows,
+    })
+}
+
+pub fn adder_preset(name: &str, outputs: Vec<(String, Expr)>) -> EvalResultT<AdderResult> {
+    let outputs = outputs
+        .into_iter()
+        .map(|(name, expr)| simplify_logic(&expr).map(|expr| (name, expr)))
+        .collect::<EvalResultT<Vec<_>>>()?;
+    Ok(AdderResult {
+        name: name.into(),
+        outputs,
+    })
+}
+
+fn gray_labels(width: usize) -> Vec<String> {
+    match width {
+        0 => vec!["".into()],
+        1 => vec!["0".into(), "1".into()],
+        2 => vec!["00".into(), "01".into(), "11".into(), "10".into()],
+        _ => Vec::new(),
+    }
 }
 
 fn merged_vars(left: &Expr, right: &Expr) -> Vec<String> {
@@ -281,12 +382,25 @@ fn collect_logic_vars(expr: &Expr, vars: &mut BTreeSet<String>) {
         Expr::Variable(name) => {
             vars.insert(name.clone());
         }
-        Expr::Not(e) | Expr::Truth(e) | Expr::Circuit(e) | Expr::LogicSimplify(e) => {
+        Expr::Not(e)
+        | Expr::Truth(e)
+        | Expr::Circuit(e)
+        | Expr::LogicSimplify(e)
+        | Expr::KMap(_, e) => {
             collect_logic_vars(e, vars)
         }
         Expr::Equiv(l, r) => {
             collect_logic_vars(l, vars);
             collect_logic_vars(r, vars);
+        }
+        Expr::HalfAdder(l, r) => {
+            collect_logic_vars(l, vars);
+            collect_logic_vars(r, vars);
+        }
+        Expr::FullAdder(a, b, c) => {
+            collect_logic_vars(a, vars);
+            collect_logic_vars(b, vars);
+            collect_logic_vars(c, vars);
         }
         Expr::Logic(_, l, r) => {
             collect_logic_vars(l, vars);

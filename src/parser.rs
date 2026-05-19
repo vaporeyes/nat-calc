@@ -20,7 +20,7 @@ fn is_builtin(name: &str) -> bool {
     matches!(
         name,
         "simplify" | "expand" | "derive" | "truth" | "circuit" | "logic_simplify" | "equiv"
-            | "sin" | "cos" | "tan" | "exp" | "ln"
+            | "kmap" | "half_adder" | "full_adder" | "sin" | "cos" | "tan" | "exp" | "ln"
     )
 }
 
@@ -248,6 +248,50 @@ impl Parser {
             return Ok(Expr::Equiv(Box::new(left), Box::new(right)));
         }
 
+        if name == "kmap" {
+            let args = self.parse_arg_list()?;
+            if args.is_empty() {
+                return Err(EvalError::Parse("kmap expects an expression".into()));
+            }
+            if args.len() == 1 {
+                return Ok(Expr::KMap(Vec::new(), Box::new(args[0].clone())));
+            }
+            let mut vars = Vec::new();
+            for arg in &args[..args.len() - 1] {
+                if let Expr::Variable(name) = arg {
+                    vars.push(name.clone());
+                } else {
+                    return Err(EvalError::Parse(
+                        "kmap variable arguments must be names".into(),
+                    ));
+                }
+            }
+            return Ok(Expr::KMap(vars, Box::new(args[args.len() - 1].clone())));
+        }
+
+        if name == "half_adder" {
+            let args = self.parse_arg_list()?;
+            if args.len() != 2 {
+                return Err(EvalError::Parse("half_adder expects two inputs".into()));
+            }
+            return Ok(Expr::HalfAdder(
+                Box::new(args[0].clone()),
+                Box::new(args[1].clone()),
+            ));
+        }
+
+        if name == "full_adder" {
+            let args = self.parse_arg_list()?;
+            if args.len() != 3 {
+                return Err(EvalError::Parse("full_adder expects three inputs".into()));
+            }
+            return Ok(Expr::FullAdder(
+                Box::new(args[0].clone()),
+                Box::new(args[1].clone()),
+                Box::new(args[2].clone()),
+            ));
+        }
+
         let arg = self.parse_expr(0)?;
         self.expect(Token::RParen)?;
 
@@ -267,6 +311,22 @@ impl Parser {
             }
         };
         Ok(built)
+    }
+
+    fn parse_arg_list(&mut self) -> EvalResultT<Vec<Expr>> {
+        let mut args = Vec::new();
+        loop {
+            args.push(self.parse_expr(0)?);
+            match self.next() {
+                Token::Comma => continue,
+                Token::RParen => return Ok(args),
+                other => {
+                    return Err(EvalError::Parse(format!(
+                        "expected ',' or ')' in argument list, found {other:?}"
+                    )));
+                }
+            }
+        }
     }
 
     /// Matrix literal: `[a, b; c, d]`. Rows separated by `;`, columns by `,`.

@@ -99,6 +99,9 @@ pub enum Expr {
     Circuit(Box<Expr>),
     LogicSimplify(Box<Expr>),
     Equiv(Box<Expr>, Box<Expr>),
+    KMap(Vec<String>, Box<Expr>),
+    HalfAdder(Box<Expr>, Box<Expr>),
+    FullAdder(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
 impl Expr {
@@ -147,13 +150,16 @@ impl Expr {
             | Expr::Truth(e)
             | Expr::Circuit(e)
             | Expr::LogicSimplify(e)
+            | Expr::KMap(_, e)
             | Expr::Lambda(_, e) => 1 + e.node_count(),
             Expr::Binary(_, l, r)
             | Expr::Logic(_, l, r)
             | Expr::Equiv(l, r)
+            | Expr::HalfAdder(l, r)
             | Expr::Apply(l, r) => {
                 1 + l.node_count() + r.node_count()
             }
+            Expr::FullAdder(a, b, c) => 1 + a.node_count() + b.node_count() + c.node_count(),
         }
     }
 }
@@ -194,6 +200,15 @@ impl fmt::Display for Expr {
             Expr::Circuit(e) => write!(f, "circuit({e})"),
             Expr::LogicSimplify(e) => write!(f, "logic_simplify({e})"),
             Expr::Equiv(l, r) => write!(f, "equiv({l}, {r})"),
+            Expr::KMap(vars, e) => {
+                if vars.is_empty() {
+                    write!(f, "kmap({e})")
+                } else {
+                    write!(f, "kmap({}, {e})", vars.join(", "))
+                }
+            }
+            Expr::HalfAdder(a, b) => write!(f, "half_adder({a}, {b})"),
+            Expr::FullAdder(a, b, c) => write!(f, "full_adder({a}, {b}, {c})"),
         }
     }
 }

@@ -190,7 +190,7 @@ impl CalcApp {
 
 fn logic_target(expr: &Expr) -> Option<&Expr> {
     match expr {
-        Expr::Truth(e) | Expr::Circuit(e) | Expr::LogicSimplify(e) => Some(e),
+        Expr::Truth(e) | Expr::Circuit(e) | Expr::LogicSimplify(e) | Expr::KMap(_, e) => Some(e),
         Expr::Bool(_) | Expr::Not(_) | Expr::Logic(_, _, _) => Some(expr),
         _ => None,
     }
@@ -217,6 +217,8 @@ fn mode_of(r: &EvalResult) -> Mode {
         EvalResult::TruthTable(_) => Mode::Logic,
         EvalResult::CircuitDiagram(_) => Mode::Logic,
         EvalResult::EquivResult(_) => Mode::Logic,
+        EvalResult::KMap(_) => Mode::Logic,
+        EvalResult::AdderResult(_) => Mode::Logic,
         EvalResult::Matrix(_) => Mode::Matrix,
         EvalResult::Symbolic(_) => Mode::Lazy,
         EvalResult::Lambda(_) => Mode::Lambda,

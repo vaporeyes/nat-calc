@@ -99,9 +99,15 @@ fn free_vars(e: &Expr, acc: &mut BTreeSet<String>) {
         Expr::Apply(l, r)
         | Expr::Binary(_, l, r)
         | Expr::Logic(_, l, r)
-        | Expr::Equiv(l, r) => {
+        | Expr::Equiv(l, r)
+        | Expr::HalfAdder(l, r) => {
             free_vars(l, acc);
             free_vars(r, acc);
+        }
+        Expr::FullAdder(a, b, c) => {
+            free_vars(a, acc);
+            free_vars(b, acc);
+            free_vars(c, acc);
         }
         Expr::Neg(x)
         | Expr::Not(x)
@@ -112,6 +118,7 @@ fn free_vars(e: &Expr, acc: &mut BTreeSet<String>) {
         | Expr::Truth(x)
         | Expr::Circuit(x)
         | Expr::LogicSimplify(x)
+        | Expr::KMap(_, x)
         | Expr::Derive(_, x) => free_vars(x, acc),
         Expr::Matrix(rows) => {
             for el in rows.iter().flatten() {
@@ -173,6 +180,15 @@ fn substitute(expr: Expr, var: &str, value: &Expr) -> Expr {
             Box::new(substitute(*l, var, value)),
             Box::new(substitute(*r, var, value)),
         ),
+        Expr::HalfAdder(l, r) => Expr::HalfAdder(
+            Box::new(substitute(*l, var, value)),
+            Box::new(substitute(*r, var, value)),
+        ),
+        Expr::FullAdder(a, b, c) => Expr::FullAdder(
+            Box::new(substitute(*a, var, value)),
+            Box::new(substitute(*b, var, value)),
+            Box::new(substitute(*c, var, value)),
+        ),
         Expr::Call(func, x) => {
             Expr::Call(func, Box::new(substitute(*x, var, value)))
         }
@@ -183,6 +199,7 @@ fn substitute(expr: Expr, var: &str, value: &Expr) -> Expr {
         Expr::Truth(x) => Expr::Truth(Box::new(substitute(*x, var, value))),
         Expr::Circuit(x) => Expr::Circuit(Box::new(substitute(*x, var, value))),
         Expr::LogicSimplify(x) => Expr::LogicSimplify(Box::new(substitute(*x, var, value))),
+        Expr::KMap(vars, x) => Expr::KMap(vars, Box::new(substitute(*x, var, value))),
         Expr::Derive(v, x) => {
             Expr::Derive(v, Box::new(substitute(*x, var, value)))
         }

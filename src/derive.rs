@@ -113,6 +113,10 @@ pub fn derive(var: &str, expr: &Expr) -> EvalResultT<Expr> {
         Expr::Equiv(_, _) => Err(EvalError::TypeMismatch(
             "cannot differentiate an equivalence check".into(),
         )),
+        Expr::KMap(_, e) => derive(var, e),
+        Expr::HalfAdder(_, _) | Expr::FullAdder(_, _, _) => Err(EvalError::TypeMismatch(
+            "cannot differentiate an adder preset".into(),
+        )),
 
         // Differentiate through explicit command wrappers by differentiating
         // their target. Nested `derive` (higher-order) is not supported.
