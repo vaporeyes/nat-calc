@@ -1,7 +1,10 @@
 // ABOUTME: BigDecimal numeric helpers (integer detection, exact pow).
 // ABOUTME: Keeps exactness; non-integer powers stay symbolic upstream.
 
-use bigdecimal::{BigDecimal, One, Zero};
+use bigdecimal::{BigDecimal, Context, One, RoundingMode, Zero};
+use std::num::NonZeroU64;
+
+const DIVISION_PRECISION: u64 = 34;
 
 /// Returns the value as an `i64` exponent iff it is an exact integer that
 /// fits. Used to decide when `^` can be folded exactly.
@@ -37,8 +40,17 @@ pub fn pow_int(base: &BigDecimal, exp: i64) -> BigDecimal {
             // Caller must guard; defensively return zero.
             return BigDecimal::zero();
         }
-        (BigDecimal::one() / acc).normalized()
+        bounded_div(&BigDecimal::one(), &acc)
     } else {
         acc.normalized()
     }
+}
+
+/// Decimal division with an explicit precision cap.
+pub fn bounded_div(a: &BigDecimal, b: &BigDecimal) -> BigDecimal {
+    let ctx = Context::new(
+        NonZeroU64::new(DIVISION_PRECISION).expect("precision is non-zero"),
+        RoundingMode::HalfEven,
+    );
+    ctx.multiply(a, &ctx.invert(b)).normalized()
 }

@@ -3,7 +3,7 @@
 
 use crate::ast::{BinaryOp, Expr, Func};
 use crate::error::{EvalError, EvalResultT};
-use bigdecimal::{BigDecimal, One};
+use bigdecimal::{BigDecimal, One, Zero};
 
 /// d/d`var` of `expr`, as a raw (unsimplified) AST. The engine simplifies
 /// the result afterwards.
@@ -32,6 +32,15 @@ pub fn derive(var: &str, expr: &Expr) -> EvalResultT<Expr> {
         Expr::Binary(BinaryOp::Mul, u, v) => {
             let du = derive(var, u)?;
             let dv = derive(var, v)?;
+            if is_zero(&du) && is_zero(&dv) {
+                return Ok(zero());
+            }
+            if is_zero(&du) {
+                return Ok(Expr::binary(BinaryOp::Mul, (**u).clone(), dv));
+            }
+            if is_zero(&dv) {
+                return Ok(Expr::binary(BinaryOp::Mul, du, (**v).clone()));
+            }
             Ok(Expr::binary(
                 BinaryOp::Add,
                 Expr::binary(BinaryOp::Mul, du, (**v).clone()),
@@ -43,6 +52,9 @@ pub fn derive(var: &str, expr: &Expr) -> EvalResultT<Expr> {
         Expr::Binary(BinaryOp::Div, u, v) => {
             let du = derive(var, u)?;
             let dv = derive(var, v)?;
+            if is_zero(&du) && is_zero(&dv) {
+                return Ok(zero());
+            }
             let numerator = Expr::binary(
                 BinaryOp::Sub,
                 Expr::binary(BinaryOp::Mul, du, (**v).clone()),
@@ -60,6 +72,9 @@ pub fn derive(var: &str, expr: &Expr) -> EvalResultT<Expr> {
 
         Expr::Call(f, arg) => {
             let du = derive(var, arg)?;
+            if is_zero(&du) {
+                return Ok(zero());
+            }
             let outer = match f {
                 // (sin u)' = cos(u) u'
                 Func::Sin => Expr::call(Func::Cos, (**arg).clone()),
@@ -108,6 +123,9 @@ fn derive_pow(var: &str, base: &Expr, exp: &Expr) -> EvalResultT<Expr> {
 
     // Constant exponent -> power rule: (u^n)' = n*u^(n-1)*u'
     if let Expr::Number(n) = exp {
+        if n.is_zero() || is_zero(&du) {
+            return Ok(zero());
+        }
         let n_minus_1 = (n - BigDecimal::one()).normalized();
         return Ok(Expr::binary(
             BinaryOp::Mul,
@@ -122,6 +140,9 @@ fn derive_pow(var: &str, base: &Expr, exp: &Expr) -> EvalResultT<Expr> {
 
     // General case: (u^v)' = u^v * (v'*ln(u) + v*u'/u)
     let dv = derive(var, exp)?;
+    if is_zero(&du) && is_zero(&dv) {
+        return Ok(zero());
+    }
     let term1 = Expr::binary(BinaryOp::Mul, dv, Expr::call(Func::Ln, base.clone()));
     let term2 = Expr::binary(
         BinaryOp::Mul,
@@ -133,4 +154,12 @@ fn derive_pow(var: &str, base: &Expr, exp: &Expr) -> EvalResultT<Expr> {
         Expr::binary(BinaryOp::Pow, base.clone(), exp.clone()),
         Expr::binary(BinaryOp::Add, term1, term2),
     ))
+}
+
+fn zero() -> Expr {
+    Expr::Number(BigDecimal::zero())
+}
+
+fn is_zero(expr: &Expr) -> bool {
+    matches!(expr, Expr::Number(n) if n.is_zero())
 }

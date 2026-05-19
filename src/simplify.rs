@@ -3,8 +3,9 @@
 
 use crate::ast::{BinaryOp, Expr};
 use crate::error::{EvalError, EvalResultT};
-use crate::numeric::{as_integer_exponent, pow_int};
+use crate::numeric::{as_integer_exponent, bounded_div, pow_int};
 use bigdecimal::{BigDecimal, One, Zero};
+use std::collections::BTreeMap;
 
 /// AST node-count ceiling enforced per pass (spec: combinatorial explosion).
 pub const MAX_NODES: usize = 10_000;
@@ -91,8 +92,7 @@ fn rewrite_node(expr: Expr) -> EvalResultT<Expr> {
 
 fn collect_sum(expr: &Expr) -> Expr {
     let mut constant = BigDecimal::zero();
-    // Insertion-ordered (base, coefficient) groups for deterministic output.
-    let mut groups: Vec<(Expr, BigDecimal)> = Vec::new();
+    let mut groups: BTreeMap<Expr, BigDecimal> = BTreeMap::new();
 
     let mut terms = Vec::new();
     flatten_sum(expr, BigDecimal::one(), &mut terms);
@@ -101,11 +101,10 @@ fn collect_sum(expr: &Expr) -> Expr {
         match base {
             None => constant += coeff,
             Some(b) => {
-                if let Some(slot) = groups.iter_mut().find(|(eb, _)| *eb == b) {
-                    slot.1 += &coeff;
-                } else {
-                    groups.push((b, coeff));
-                }
+                groups
+                    .entry(b)
+                    .and_modify(|existing| *existing += &coeff)
+                    .or_insert(coeff);
             }
         }
     }
@@ -183,7 +182,7 @@ fn split_coefficient(expr: &Expr) -> (BigDecimal, Option<Expr>) {
 
 fn collect_product(expr: &Expr) -> Expr {
     let mut constant = BigDecimal::one();
-    let mut groups: Vec<(Expr, BigDecimal)> = Vec::new();
+    let mut groups: BTreeMap<Expr, BigDecimal> = BTreeMap::new();
 
     let mut factors = Vec::new();
     flatten_product(expr, &mut constant, &mut factors);
@@ -193,11 +192,10 @@ fn collect_product(expr: &Expr) -> Expr {
     }
 
     for (base, exp) in factors {
-        if let Some(slot) = groups.iter_mut().find(|(eb, _)| *eb == base) {
-            slot.1 += &exp;
-        } else {
-            groups.push((base, exp));
-        }
+        groups
+            .entry(base)
+            .and_modify(|existing| *existing += &exp)
+            .or_insert(exp);
     }
 
     // A -1 constant alongside other factors reads better as negation.
@@ -262,7 +260,7 @@ fn rewrite_div(l: Expr, r: Expr) -> EvalResultT<Expr> {
         if b.is_zero() {
             return Err(EvalError::DivisionByZero);
         }
-        return Ok(Expr::Number((a / b).normalized()));
+        return Ok(Expr::Number(bounded_div(a, b)));
     }
     if is_one(&r) {
         return Ok(l);

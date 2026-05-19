@@ -4,7 +4,7 @@
 use crate::ast::Expr;
 use crate::engine::Environment;
 use crate::error::{EvalError, EvalResultT};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 /// Hard cap on beta/expansion steps (Section 3: divergence mitigation).
 /// `(\x. x x)(\x. x x)` and friends hit this instead of looping forever.
@@ -15,7 +15,8 @@ pub const MAX_BETA_STEPS: usize = 100_000;
 /// stored lambda act as a user-defined function — Sub-Task 4).
 pub fn reduce_lambda(expr: Expr, env: &Environment) -> EvalResultT<Expr> {
     let mut steps = 0usize;
-    normal_form(expr, env, &mut steps)
+    let mut resolving = env.resolving_names();
+    normal_form(expr, env, &mut resolving, &mut steps)
 }
 
 fn tick(steps: &mut usize) -> EvalResultT<()> {
@@ -29,12 +30,17 @@ fn tick(steps: &mut usize) -> EvalResultT<()> {
 
 /// Weak head normal form: peel outermost redexes and expand the head
 /// variable from the environment until the head is irreducible.
-fn whnf(expr: Expr, env: &Environment, steps: &mut usize) -> EvalResultT<Expr> {
+fn whnf(
+    expr: Expr,
+    env: &Environment,
+    resolving: &mut HashSet<String>,
+    steps: &mut usize,
+) -> EvalResultT<Expr> {
     let mut e = expr;
     loop {
         match e {
             Expr::Apply(f, a) => {
-                let f = whnf(*f, env, steps)?;
+                let f = whnf(*f, env, resolving, steps)?;
                 if let Expr::Lambda(param, body) = f {
                     tick(steps)?;
                     e = substitute(*body, &param, &a);
@@ -43,8 +49,10 @@ fn whnf(expr: Expr, env: &Environment, steps: &mut usize) -> EvalResultT<Expr> {
                 }
             }
             Expr::Variable(name) => match env.get(&name) {
+                _ if resolving.contains(&name) => return Ok(Expr::Variable(name)),
                 Some(bound) => {
                     tick(steps)?;
+                    resolving.insert(name);
                     e = bound.clone();
                 }
                 None => return Ok(Expr::Variable(name)),
@@ -59,16 +67,17 @@ fn whnf(expr: Expr, env: &Environment, steps: &mut usize) -> EvalResultT<Expr> {
 fn normal_form(
     expr: Expr,
     env: &Environment,
+    resolving: &mut HashSet<String>,
     steps: &mut usize,
 ) -> EvalResultT<Expr> {
-    match whnf(expr, env, steps)? {
+    match whnf(expr, env, resolving, steps)? {
         Expr::Lambda(param, body) => {
-            let body = normal_form(*body, env, steps)?;
+            let body = normal_form(*body, env, resolving, steps)?;
             Ok(Expr::Lambda(param, Box::new(body)))
         }
         Expr::Apply(f, a) => {
-            let f = normal_form(*f, env, steps)?;
-            let a = normal_form(*a, env, steps)?;
+            let f = normal_form(*f, env, resolving, steps)?;
+            let a = normal_form(*a, env, resolving, steps)?;
             Ok(Expr::Apply(Box::new(f), Box::new(a)))
         }
         other => Ok(other),

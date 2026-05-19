@@ -225,7 +225,7 @@ impl Parser {
 
         if *self.peek() == Token::RBracket {
             self.pos += 1;
-            return Ok(Expr::Matrix(rows));
+            return Err(EvalError::Parse("matrix cannot be empty".into()));
         }
 
         loop {

@@ -6,7 +6,7 @@ use crate::derive::derive;
 use crate::error::{EvalError, EvalResultT};
 use crate::expand::expand;
 use crate::lambda::reduce_lambda;
-use crate::numeric::{as_integer_exponent, pow_int};
+use crate::numeric::{as_integer_exponent, bounded_div, pow_int};
 use crate::simplify::simplify;
 use bigdecimal::{BigDecimal, Zero};
 use std::collections::{HashMap, HashSet};
@@ -49,7 +49,7 @@ impl std::fmt::Display for EvalResult {
 /// Variables are stored as unevaluated `Expr` (Sub-Task 1). A simple result
 /// cache provides memoization; any assignment clears it (correct and
 /// monotonic, the spec's alternative to a dependency DAG).
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Environment {
     vars: HashMap<String, Expr>,
     cache: HashMap<String, EvalResult>,
@@ -79,6 +79,10 @@ impl Environment {
             .collect();
         out.sort_by(|a, b| a.0.cmp(&b.0));
         out
+    }
+
+    pub(crate) fn resolving_names(&self) -> HashSet<String> {
+        self.resolving.clone()
     }
 
     fn store(&mut self, name: String, value: Expr) {
@@ -211,7 +215,7 @@ fn numeric_op(
             if b.is_zero() {
                 return Err(EvalError::DivisionByZero);
             }
-            a / b
+            bounded_div(&a, &b)
         }
         BinaryOp::Pow => match as_integer_exponent(&b) {
             Some(e) if !(a.is_zero() && e < 0) => pow_int(&a, e),
@@ -322,7 +326,7 @@ fn scalar_matrix(op: BinaryOp, s: BigDecimal, m: Mat) -> EvalResultT<EvalResult>
             if s.is_zero() {
                 return Err(EvalError::DivisionByZero);
             }
-            Ok(EvalResult::Matrix(map_matrix(m, |v| &v / &s)))
+            Ok(EvalResult::Matrix(map_matrix(m, |v| bounded_div(&v, &s))))
         }
         _ => Err(EvalError::TypeMismatch(
             "only scalar * / matrix is supported".into(),

@@ -4,7 +4,7 @@
 use bigdecimal::BigDecimal;
 use std::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BinaryOp {
     Add,
     Sub,
@@ -27,7 +27,7 @@ impl BinaryOp {
 
 /// Transcendental functions kept exact: they reduce symbolically rather
 /// than to a lossy floating-point approximation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Func {
     Sin,
     Cos,
@@ -51,7 +51,7 @@ impl Func {
 /// The unevaluated expression tree. The `Environment` stores variables as
 /// `Expr` values (not primitives), which is what makes lazy evaluation and
 /// delayed binding possible.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Expr {
     Number(BigDecimal),
     Variable(String),

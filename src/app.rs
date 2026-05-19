@@ -61,6 +61,9 @@ struct Cell {
 pub struct CalcApp {
     cells: Vec<Cell>,
     draft: String,
+    history: Vec<String>,
+    history_cursor: Option<usize>,
+    history_stash: String,
     bindings: Vec<(String, String, Mode)>,
     focus_input: bool,
 }
@@ -71,6 +74,9 @@ impl CalcApp {
         Self {
             cells: Vec::new(),
             draft: String::new(),
+            history: Vec::new(),
+            history_cursor: None,
+            history_stash: String::new(),
             bindings: Vec::new(),
             focus_input: true,
         }
@@ -97,7 +103,7 @@ impl CalcApp {
             .bindings()
             .into_iter()
             .map(|(name, expr)| {
-                let mut probe = env_with(&self.cells);
+                let mut probe = env.clone();
                 let mode = match eval(&name, &mut probe) {
                     Ok(r) => mode_of(&r),
                     Err(_) => Mode::Error,
@@ -112,6 +118,9 @@ impl CalcApp {
         if src.is_empty() {
             return;
         }
+        self.history.push(src.clone());
+        self.history_cursor = None;
+        self.history_stash.clear();
         self.cells.push(Cell {
             src,
             mode: Mode::Eager,
@@ -121,14 +130,39 @@ impl CalcApp {
         self.focus_input = true;
         self.recompute();
     }
-}
 
-fn env_with(cells: &[Cell]) -> Environment {
-    let mut env = Environment::new();
-    for cell in cells {
-        let _ = eval(&cell.src, &mut env);
+    fn history_up(&mut self) {
+        if self.history.is_empty() {
+            return;
+        }
+        let index = match self.history_cursor {
+            Some(0) => 0,
+            Some(i) => i - 1,
+            None => {
+                self.history_stash.clone_from(&self.draft);
+                self.history.len() - 1
+            }
+        };
+        self.history_cursor = Some(index);
+        self.draft.clone_from(&self.history[index]);
+        self.focus_input = true;
     }
-    env
+
+    fn history_down(&mut self) {
+        let Some(i) = self.history_cursor else {
+            return;
+        };
+        if i + 1 < self.history.len() {
+            let next = i + 1;
+            self.history_cursor = Some(next);
+            self.draft.clone_from(&self.history[next]);
+        } else {
+            self.history_cursor = None;
+            self.draft.clone_from(&self.history_stash);
+            self.history_stash.clear();
+        }
+        self.focus_input = true;
+    }
 }
 
 fn mode_of(r: &EvalResult) -> Mode {
@@ -343,6 +377,26 @@ impl eframe::App for CalcApp {
                             if self.focus_input {
                                 resp.request_focus();
                                 self.focus_input = false;
+                            }
+                            if resp.has_focus()
+                                && ui.input_mut(|i| {
+                                    i.consume_key(
+                                        egui::Modifiers::NONE,
+                                        egui::Key::ArrowUp,
+                                    )
+                                })
+                            {
+                                self.history_up();
+                            }
+                            if resp.has_focus()
+                                && ui.input_mut(|i| {
+                                    i.consume_key(
+                                        egui::Modifiers::NONE,
+                                        egui::Key::ArrowDown,
+                                    )
+                                })
+                            {
+                                self.history_down();
                             }
                             if resp.lost_focus()
                                 && ui.input(|i| i.key_pressed(egui::Key::Enter))

@@ -68,7 +68,7 @@ fn expand_forces_lazy_even_when_bound() {
     // expand ignores the binding and works structurally.
     assert_eq!(
         run("expand((x + 1) ^ 2)", &mut env).to_string(),
-        "(((x ^ 2) + (2 * x)) + 1)"
+        "(((2 * x) + (x ^ 2)) + 1)"
     );
 }
 
@@ -76,6 +76,7 @@ fn expand_forces_lazy_even_when_bound() {
 fn simplify_command() {
     assert_eq!(s("simplify(x + x + x)"), "(3 * x)");
     assert_eq!(s("simplify(2 * x + 3 * x)"), "(5 * x)");
+    assert_eq!(s("simplify(a * b + b * a)"), "((2 * a) * b)");
 }
 
 // --- Symbolic differentiation -------------------------------------------
@@ -113,6 +114,12 @@ fn matrix_dimension_mismatch_errors() {
         eval("[1, 2] + [1, 2; 3, 4]", &mut env),
         Err(EvalError::TypeMismatch(_))
     ));
+}
+
+#[test]
+fn empty_matrix_is_rejected() {
+    let mut env = Environment::new();
+    assert!(matches!(eval("[]", &mut env), Err(EvalError::Parse(_))));
 }
 
 // --- Scalability guards (Section 3) -------------------------------------
@@ -164,6 +171,20 @@ fn user_defined_functions_via_binding() {
         run("compose(inc)(dbl)(10)", &mut env),
         EvalResult::Numeric(21.into())
     );
+}
+
+#[test]
+fn recursive_lambda_binding_stays_symbolic() {
+    let mut env = Environment::new();
+    run("y = \\x. y(x)", &mut env);
+    assert_eq!(run("y(1)", &mut env).to_string(), "(y 1)");
+}
+
+#[test]
+fn repeated_lambda_binding_still_expands() {
+    let mut env = Environment::new();
+    run("inc = \\x. x + 1", &mut env);
+    assert_eq!(run("inc(inc(1))", &mut env), EvalResult::Numeric(3.into()));
 }
 
 #[test]
